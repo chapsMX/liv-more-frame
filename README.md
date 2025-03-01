@@ -7,7 +7,7 @@ Liv More a blockchain-powered platform that gamifies health and wellness by allo
 
 ## Source
 Project forked from the Frames V2 Repo
-GitHub(https://github.com/farcasterxyz/frames-v2-demo)<br>
+[GitHub](https://github.com/farcasterxyz/frames-v2-demo)<br />
 
 ## Links
 [👀 WebSite](https://livmore.life/) (Mobile only)<br/>
