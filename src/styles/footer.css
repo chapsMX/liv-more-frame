@@ -1,0 +1,33 @@
+.marquee {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    height: 2em;
+  }
+  
+  .track {
+    position: absolute;
+    white-space: nowrap;
+    will-change: transform;
+    animation: marquee 30s linear infinite;
+    display: flex;
+  }
+  
+  .track-reverse {
+    position: absolute;
+    white-space: nowrap;
+    will-change: transform;
+    animation: marquee-reverse 30s linear infinite;
+    display: flex;
+    left: 0;
+  }
+  
+  @keyframes marquee {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0%); }
+  }
+  
+  @keyframes marquee-reverse {
+    from { transform: translateX(0%); }
+    to { transform: translateX(-50%); }
+  } 
