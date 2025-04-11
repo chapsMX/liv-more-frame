@@ -5,13 +5,14 @@ export const metadata: Metadata = {
   title: 'Google Auth Callback',
 };
 
-export default function Page({
+export default async function Page({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
   return <CallbackClient searchParams={searchParams} />;
 }
+
 
 
 
