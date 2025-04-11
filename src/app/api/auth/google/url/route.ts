@@ -9,13 +9,13 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !proce
 const oauth2Client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.GOOGLE_REDIRECT_URI
+  redirectUri: 'https://0f0f46525a0c.ngrok.app/auth/callback'
 });
 
 export async function GET(request: Request) {
   try {
     console.log('=== Generando URL de autenticación ===');
-    console.log('Usando redirect URI:', process.env.GOOGLE_REDIRECT_URI);
+    console.log('Usando redirect URI:', 'https://0f0f46525a0c.ngrok.app/auth/callback');
     
     // Obtener el FID del usuario
     const { searchParams } = new URL(request.url);
@@ -31,10 +31,11 @@ export async function GET(request: Request) {
     // Generar la URL de autorización
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      scope: process.env.GOOGLE_OAUTH_SCOPES?.split(' ') || [
+      scope: [
         'https://www.googleapis.com/auth/fitness.activity.read',
-        'https://www.googleapis.com/auth/fitness.heart_rate.read',
-        'https://www.googleapis.com/auth/fitness.sleep.read'
+        'https://www.googleapis.com/auth/fitness.body.read',
+        'https://www.googleapis.com/auth/fitness.sleep.read',
+        'https://www.googleapis.com/auth/fitness.heart_rate.read'
       ],
       state: userFid, // Incluir el FID en el estado
       prompt: 'consent'

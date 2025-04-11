@@ -44,23 +44,30 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Guardar los objetivos en la base de datos
+    // Guardar los objetivos en la tabla user_goals
     await sql`
-      UPDATE user_connections 
-      SET 
-        steps_goal = ${steps},
-        calories_goal = ${calories},
-        sleep_goal = ${sleep},
-        has_goals = true,
-        updated_at = ${new Date()}
-      WHERE user_fid = ${parseInt(userFid)}
+      INSERT INTO user_goals (
+        user_fid,
+        steps_goal,
+        calories_goal,
+        sleep_hours_goal,
+        updated_at
+      ) VALUES (
+        ${parseInt(userFid)},
+        ${steps},
+        ${calories},
+        ${sleep},
+        ${new Date()}
+      )
+      ON CONFLICT (user_fid) 
+      DO UPDATE SET 
+        steps_goal = EXCLUDED.steps_goal,
+        calories_goal = EXCLUDED.calories_goal,
+        sleep_hours_goal = EXCLUDED.sleep_hours_goal,
+        updated_at = EXCLUDED.updated_at
     `;
 
-    return NextResponse.json({
-      success: true,
-      message: 'Objetivos guardados correctamente'
-    });
-
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al guardar objetivos:', error);
     return NextResponse.json({ 

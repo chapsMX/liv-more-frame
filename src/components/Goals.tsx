@@ -7,14 +7,44 @@ import Image from 'next/image';
 interface GoalsProps {
   onSave: () => void;
   displayName: string;
+  userFid: string;
 }
 
-const Goals = ({ onSave, displayName }: GoalsProps) => {
+const Goals = ({ onSave, displayName, userFid }: GoalsProps) => {
   const [steps, setSteps] = useState('10000');
   const [calories, setCalories] = useState('2500');
   const [sleep, setSleep] = useState('8');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const handleDisconnect = async () => {
+    try {
+      setDisconnecting(true);
+      setError(null);
+
+      const response = await fetch('/api/auth/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userFid })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Error al desconectar la cuenta');
+      }
+
+      // Redirigir al inicio
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error al desconectar:', error);
+      setError(error instanceof Error ? error.message : 'Error desconocido');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +57,7 @@ const Goals = ({ onSave, displayName }: GoalsProps) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-fid': '123' // TODO: Obtener el FID real del usuario
+          'x-user-fid': userFid
         },
         body: JSON.stringify({
           steps: parseInt(steps),
@@ -118,7 +148,7 @@ const Goals = ({ onSave, displayName }: GoalsProps) => {
                 </div>
               )}
 
-              <div className="flex justify-center">
+              <div className="flex flex-col gap-4">
                 <button
                   type="submit"
                   disabled={saving}
@@ -127,6 +157,17 @@ const Goals = ({ onSave, displayName }: GoalsProps) => {
                   `}
                 >
                   {saving ? 'Guardando...' : 'Guardar Objetivos'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className={`
+                    ${protoMono.className} w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors
+                  `}
+                >
+                  {disconnecting ? 'Desconectando...' : 'Desconectar Google Fit'}
                 </button>
               </div>
             </form>

@@ -5,20 +5,20 @@ import { OAuth2Client } from 'google-auth-library';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Asegurarnos de que tenemos todas las variables de entorno necesarias
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error('Faltan variables de entorno necesarias para Google OAuth');
 }
 
 const oauth2Client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.GOOGLE_REDIRECT_URI
+  redirectUri: 'https://0f0f46525a0c.ngrok.app/auth/callback'
 });
 
 export async function POST(request: Request) {
   try {
     console.log('=== Iniciando proceso de guardado de tokens ===');
-    console.log('Usando redirect URI:', process.env.GOOGLE_REDIRECT_URI);
+    console.log('Usando redirect URI:', 'https://0f0f46525a0c.ngrok.app/auth/callback');
     
     const { code } = await request.json();
     const userFid = request.headers.get('x-user-fid');
@@ -85,15 +85,17 @@ export async function POST(request: Request) {
     try {
       const result = await sql`
         INSERT INTO user_connections 
-          (user_fid, google_token, token_expiry, updated_at)
+          (user_fid, google_token, refresh_token, token_expiry, updated_at)
         VALUES 
           (${userFidNumber}, 
            ${tokens.access_token}, 
+           ${tokens.refresh_token},
            ${tokens.expiry_date ? new Date(tokens.expiry_date) : null}, 
            ${new Date()})
         ON CONFLICT (user_fid) 
         DO UPDATE SET 
           google_token = EXCLUDED.google_token,
+          refresh_token = EXCLUDED.refresh_token,
           token_expiry = EXCLUDED.token_expiry,
           updated_at = EXCLUDED.updated_at
         RETURNING id, user_fid, updated_at

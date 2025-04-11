@@ -79,7 +79,7 @@ export default async function Home({ searchParams }: Props) {
     };
 
     return (
-      <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <main className="flex min-h-screen flex-col">
         <Suspense fallback={<div>Cargando...</div>}>
           {hasGoals ? (
             <Dashboard userFid={userFid} />
@@ -87,6 +87,7 @@ export default async function Home({ searchParams }: Props) {
             <Goals 
               onSave={handleGoalsSaved}
               displayName={userCheck[0].display_name || 'Usuario'}
+              userFid={userFid}
             />
           )}
         </Suspense>

@@ -6,22 +6,25 @@ import Goals from '@/components/Goals';
 export default function GoalsPage() {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [userFid, setUserFid] = useState('');
 
   useEffect(() => {
     const getUserInfo = async () => {
       try {
         // Get user info from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const userFid = urlParams.get('fid');
+        const fid = urlParams.get('fid');
 
-        if (!userFid) {
+        if (!fid) {
           console.error('No user FID provided');
           window.location.href = '/';
           return;
         }
 
+        setUserFid(fid);
+
         // Fetch user info
-        const response = await fetch(`/api/neynar?fid=${userFid}`);
+        const response = await fetch(`/api/neynar?fid=${fid}`);
         const data = await response.json();
 
         if (data.success && data.user) {
@@ -41,32 +44,31 @@ export default function GoalsPage() {
     getUserInfo();
   }, []);
 
-  const handleSaveGoals = async (goals: { steps: number; sleep: number; calories: number }) => {
+  const handleSaveGoals = async () => {
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const userFid = urlParams.get('fid');
-
       const response = await fetch('/api/goals/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-fid': userFid
         },
         body: JSON.stringify({
-          user_fid: userFid,
-          ...goals
-        }),
+          steps: 10000,
+          calories: 2500,
+          sleep: 8
+        })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Redirect to main app view
         window.location.href = `/?fid=${userFid}`;
       } else {
-        console.error('Failed to save goals:', data.error);
+        throw new Error(data.error || 'Error al guardar los objetivos');
       }
     } catch (error) {
       console.error('Error saving goals:', error);
+      throw error;
     }
   };
 
@@ -81,5 +83,9 @@ export default function GoalsPage() {
     );
   }
 
-  return <Goals onSave={handleSaveGoals} displayName={displayName} />;
+  return <Goals 
+    onSave={handleSaveGoals} 
+    displayName={displayName}
+    userFid={userFid}
+  />;
 } 

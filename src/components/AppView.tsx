@@ -73,15 +73,13 @@ export default function AppView({ username, displayName, onConnectGoogle }: AppV
           console.log('Connection status:', connectionData);
           setConnectionStatus(connectionData);
 
-          // If connected, check if goals are already set
+          // Si está conectado, verificar objetivos y redirigir
           if (connectionData.isConnected) {
             const goalsResponse = await fetch(`/api/goals/check?user_fid=${userFid}`);
             const goalsData = await goalsResponse.json();
 
-            // Only redirect to goals if they haven't been set yet
-            if (!goalsData.hasGoals) {
-              window.location.href = `/goals?fid=${userFid}`;
-            }
+            // Redirigir a la página principal con el fid
+            window.location.href = `/?fid=${userFid}`;
           }
         }
       } catch (error) {
@@ -101,14 +99,20 @@ export default function AppView({ username, displayName, onConnectGoogle }: AppV
       setIsLoading(true);
       const checkConnection = async () => {
         try {
-          const response = await fetch(`/api/neynar?fid=${username}`);
+          const response = await fetch(`/api/neynar?username=${username}`);
           const userData = await response.json();
           
           if (userData.success && userData.user) {
             const userFid = userData.user.fid;
             const connectionResponse = await fetch(`/api/auth/check-connection?user_fid=${userFid}`);
             const data = await connectionResponse.json();
-            setConnectionStatus(data);
+            
+            if (data.isConnected) {
+              // Redirigir a la página principal con el fid
+              window.location.href = `/?fid=${userFid}`;
+            } else {
+              setConnectionStatus(data);
+            }
           }
         } catch (error) {
           console.error('Error verificando conexión:', error);
@@ -212,20 +216,6 @@ export default function AppView({ username, displayName, onConnectGoogle }: AppV
               <p className={protoMono.className}>
                 Conectado el: {new Date(connectionStatus.connection?.updatedAt || '').toLocaleDateString()}
               </p>
-            </div>
-          )}
-
-          {!connectionStatus?.isConnected && (
-            <div className="text-center w-full">
-              <p className="text-gray-400 mb-4">
-                Conecta tu dispositivo para comenzar a trackear tu actividad
-              </p>
-              <button
-                onClick={onConnectGoogle}
-                className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-              >
-                Conectar con Google Fit
-              </button>
             </div>
           )}
         </div>

@@ -110,72 +110,49 @@ export default function CallbackClient({ searchParams }: ClientProps) {
 
     // Iniciar el proceso inmediatamente
     handleCallback();
-  }, []); // Ya no dependemos de searchParams.code
+  }, []);
 
   const handleClose = () => {
-    // Usar la URL de ngrok desde las variables de entorno
-    window.location.href = process.env.NEXT_PUBLIC_URL || '/';
+    window.location.href = 'https://0f0f46525a0c.ngrok.app';
   };
 
+  if (status === 'processing') {
+    return (
+      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
+          <p className={protoMono.className}>Procesando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-red-500">Error: {errorMessage}</p>
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Volver
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full">
-        {status === 'processing' && (
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-lg mb-4">Procesando autenticación...</p>
-          </div>
-        )}
-        
-        {status === 'success' && (
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-green-600 mb-4">¡Conexión exitosa!</h2>
-            
-            <div className="bg-gray-50 rounded p-4 mb-4 text-left">
-              <h3 className="font-semibold mb-2">Parámetros de la URL:</h3>
-              <pre className="whitespace-pre-wrap break-words text-sm">
-                {JSON.stringify(responseData?.urlParams, null, 2)}
-              </pre>
-            </div>
-
-            <div className="bg-gray-50 rounded p-4 mb-4 text-left">
-              <h3 className="font-semibold mb-2">Respuesta del servidor:</h3>
-              <pre className="whitespace-pre-wrap break-words text-sm">
-                {JSON.stringify(responseData?.serverResponse, null, 2)}
-              </pre>
-            </div>
-
-            <button
-              onClick={handleClose}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
-            >
-              Volver a la página principal
-            </button>
-          </div>
-        )}
-        
-        {status === 'error' && (
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">Error en la autenticación</h2>
-            <p className="text-lg mb-4">{errorMessage}</p>
-            
-            {responseData && (
-              <div className="bg-gray-50 rounded p-4 mb-4 text-left">
-                <h3 className="font-semibold mb-2">Detalles del error:</h3>
-                <pre className="whitespace-pre-wrap break-words text-sm">
-                  {JSON.stringify(responseData, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            <button
-              onClick={handleClose}
-              className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
-            >
-              Volver a intentar
-            </button>
-          </div>
-        )}
+    <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-green-500">¡Autenticación exitosa!</p>
+        <button
+          onClick={handleClose}
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          Continuar
+        </button>
       </div>
     </div>
   );

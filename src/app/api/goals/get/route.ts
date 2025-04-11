@@ -13,20 +13,20 @@ export async function GET(request: Request) {
       }, { status: 401 });
     }
 
-    // Obtener los objetivos del usuario
+    // Obtener los objetivos del usuario de la tabla user_goals
     const goals = await sql`
       SELECT 
         steps_goal,
         calories_goal,
-        sleep_goal
-      FROM user_connections 
+        sleep_hours_goal
+      FROM user_goals 
       WHERE user_fid = ${parseInt(userFid)}
     `;
 
     if (goals.length === 0) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Usuario no encontrado' 
+        error: 'Usuario no tiene objetivos configurados' 
       }, { status: 404 });
     }
 
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       data: {
         steps: goals[0].steps_goal,
         calories: goals[0].calories_goal,
-        sleep: goals[0].sleep_goal
+        sleep: goals[0].sleep_hours_goal
       }
     });
 

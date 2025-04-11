@@ -16,11 +16,26 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Actualizar la base de datos para eliminar el token
+    // Primero, obtener el registro actual
+    const currentConnection = await sql`
+      SELECT id, user_fid, google_token, refresh_token, token_expiry
+      FROM user_connections 
+      WHERE user_fid = ${parseInt(userFid)}
+    `;
+
+    if (currentConnection.length === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'No se encontró la conexión del usuario' 
+      }, { status: 404 });
+    }
+
+    // Actualizar la base de datos para eliminar los tokens
     const result = await sql`
       UPDATE user_connections 
-      SET google_token = NULL, 
-          token_expiry = NULL, 
+      SET google_token = NULL,
+          refresh_token = NULL,
+          token_expiry = NULL,
           updated_at = ${new Date()}
       WHERE user_fid = ${parseInt(userFid)}
       RETURNING id, user_fid, updated_at

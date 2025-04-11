@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
+import { protoMono } from '../styles/fonts';
 
 interface Goal {
   steps: number;
@@ -38,6 +39,35 @@ const Dashboard = ({ userFid }: DashboardProps) => {
   const [weeklyStats, setWeeklyStats] = useState<DailyStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const handleDisconnect = async () => {
+    try {
+      setDisconnecting(true);
+      setError(null);
+
+      const response = await fetch('/api/auth/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userFid })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Error al desconectar la cuenta');
+      }
+
+      // Redirigir al inicio
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error al desconectar:', error);
+      setError(error instanceof Error ? error.message : 'Error desconocido');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   useEffect(() => {
     fetchUserData();
@@ -50,6 +80,8 @@ const Dashboard = ({ userFid }: DashboardProps) => {
       setLoading(true);
       setError(null);
 
+      console.log('Obteniendo datos para userFid:', userFid);
+
       // Obtener objetivos del usuario
       const goalsResponse = await fetch('/api/goals/get', {
         headers: {
@@ -57,6 +89,7 @@ const Dashboard = ({ userFid }: DashboardProps) => {
         }
       });
       const goalsData = await goalsResponse.json();
+      console.log('Respuesta de objetivos:', goalsData);
 
       if (!goalsData.success) {
         throw new Error(goalsData.error || 'Error al obtener objetivos');
@@ -71,6 +104,7 @@ const Dashboard = ({ userFid }: DashboardProps) => {
         }
       });
       const dailyData = await dailyResponse.json();
+      console.log('Respuesta de datos diarios:', dailyData);
 
       if (!dailyData.success) {
         throw new Error(dailyData.error || 'Error al obtener datos diarios');
@@ -85,6 +119,7 @@ const Dashboard = ({ userFid }: DashboardProps) => {
         }
       });
       const weeklyData = await weeklyResponse.json();
+      console.log('Respuesta de datos semanales:', weeklyData);
 
       if (!weeklyData.success) {
         throw new Error(weeklyData.error || 'Error al obtener datos semanales');
@@ -104,136 +139,187 @@ const Dashboard = ({ userFid }: DashboardProps) => {
     return Math.min((current / goal) * 100, 100);
   };
 
-  const renderProgressBar = (current: number, goal: number) => {
-    const percentage = calculatePercentage(current, goal);
-    return (
-      <div className="w-full h-2 bg-gray-200 rounded-full">
-        <div 
-          className="h-full bg-green-500 rounded-full transition-all duration-500"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    );
-  };
-
   const renderMetricCard = (
-    iconPath: string,
+    Icon: React.ComponentType<{ className?: string }>,
     title: string,
     current: number,
     goal: number,
     unit: string
-  ) => (
-    <button 
-      className={`p-4 rounded-lg shadow-lg ${
-        calculatePercentage(current, goal) >= 100 
-          ? 'bg-green-100 hover:bg-green-200' 
-          : 'bg-white hover:bg-gray-50'
-      } transition-all duration-300`}
-      onClick={() => {
-        if (calculatePercentage(current, goal) >= 100) {
-          // TODO: Implementar mint de atestación
-          console.log('Mint attestation for:', title);
-        }
-      }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-8 h-8 relative">
-          <Image
-            src={iconPath}
-            alt={title}
-            fill
-            className="object-contain"
+  ) => {
+    const percentage = calculatePercentage(current, goal);
+    const isComplete = percentage >= 100;
+    
+    return (
+      <div className="flex flex-col items-center">
+        <div className="relative">
+          <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
+            <Icon className="w-10 h-10" />
+          </div>
+          <div 
+            className={`absolute inset-0 rounded-full border-4 ${isComplete ? 'border-green-500' : 'border-red-500'}`} 
+            style={{ clipPath: isComplete ? 'none' : `inset(${100 - percentage}% 0 0 0)` }}
           />
         </div>
-        <div className="text-sm font-medium text-gray-500">{title}</div>
+        <div className="mt-4 text-center">
+          <p className={`text-base font-bold ${protoMono.className}`}>
+            <span className="text-white">{current.toLocaleString()}</span>
+            <span className="text-gray-500">/{goal.toLocaleString()}</span>
+          </p>
+          <p className={`text-[10px] text-gray-500 uppercase tracking-wide ${protoMono.className}`}>{title}</p>
+        </div>
       </div>
-      <div className="text-2xl font-bold mb-2">
-        {current.toLocaleString()} / {goal.toLocaleString()} {unit}
-      </div>
-      {renderProgressBar(current, goal)}
-    </button>
-  );
+    );
+  };
 
-  const renderWeeklyStats = () => (
-    <div className="mt-8">
-      <h3 className="text-lg font-semibold mb-4">Histórico Semanal</h3>
-      <div className="grid grid-cols-7 gap-2">
-        {weeklyStats.map((day, index) => (
-          <div key={index} className="text-center">
-            <div className="text-sm text-gray-500">
-              {new Date(day.date).toLocaleDateString('es-ES', { weekday: 'short' })}
+  const renderProgressBars = (
+    title: string,
+    data: { date: string; value: number }[],
+    goal: number,
+    unit: string
+  ) => {
+    return (
+      <div className="mb-12">
+        <h3 className={`text-xl font-bold mb-4 ${protoMono.className}`}>{title}</h3>
+        <div className="grid grid-cols-7 gap-2">
+          {/* Days of week */}
+          {data.map((day, index) => (
+            <div key={`day-${index}`} className={`text-center ${protoMono.className}`}>
+              <div className="text-gray-500 text-sm mb-1">
+                {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+              </div>
             </div>
-            <div className="mt-2 space-y-2">
-              <div className="text-sm">{day.steps.toLocaleString()}</div>
-              <div className="text-sm">{day.calories.toLocaleString()}</div>
-              <div className="text-sm">{day.sleep.toFixed(1)}h</div>
-            </div>
-          </div>
-        ))}
+          ))}
+
+          {/* Progress bars */}
+          {data.map((day, index) => {
+            const percentage = (day.value / goal) * 100;
+            const isComplete = percentage >= 100;
+            return (
+              <div key={`bar-${index}`} className="flex flex-col items-center">
+                <div className="h-32 w-full relative flex items-end">
+                  <div 
+                    className={`w-full rounded-t-sm transition-all ${isComplete ? 'bg-green-500' : 'bg-violet-500'}`}
+                    style={{ height: `${Math.min(percentage, 100)}%` }}
+                  />
+                </div>
+                <div className={`text-xs mt-2 ${protoMono.className} text-gray-400`}>
+                  {day.value.toLocaleString()}{unit}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
+          <p className={protoMono.className}>Cargando datos...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-red-600">
-        <p className="text-lg font-semibold">Error</p>
-        <p className="text-sm">{error}</p>
-        <button 
-          onClick={fetchUserData}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Reintentar
-        </button>
+      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-red-500">Error: {error}</p>
+          <button 
+            onClick={fetchUserData}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
-      <main className="max-w-4xl mx-auto p-6">
-        <h2 className="text-2xl font-bold mb-6">Tu Progreso Diario</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {renderMetricCard(
-            "/icons/steps.svg",
-            "Pasos",
-            progress.steps,
-            goals.steps,
-            "pasos"
-          )}
-          {renderMetricCard(
-            "/icons/calories.svg",
-            "Calorías",
-            progress.calories,
-            goals.calories,
-            "kcal"
-          )}
-          {renderMetricCard(
-            "/icons/sleep.svg",
-            "Sueño",
-            progress.sleep,
-            goals.sleep,
-            "horas"
-          )}
-        </div>
-        {renderWeeklyStats()}
-      </main>
-
-      <footer className="w-full overflow-hidden py-2 mb-2">
-        <div className="relative flex flex-col gap-0.5">
-          <p className="text-center text-gray-400 text-sm">
-            made with <span className="text-red-500 text-lg">❤</span> during ETH Denver
+    <div className="w-screen h-screen bg-black text-white font-mono flex flex-col">
+      <div className="w-full h-full p-6 flex flex-col">
+        {/* Header */}
+{/*         <div className="text-center mb-8">
+          <h1 className={`text-4xl font-bold mb-4 ${protoMono.className}`}>Liv More</h1>
+          <p className={`text-lg text-gray-300 max-w-3xl mx-auto ${protoMono.className}`}>
+            Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.
           </p>
+        </div> */}
+
+        {/* Daily Goals with Icons */}
+        <div className="mb-12">
+          <h1 className={`text-2xl font-bold mb-2 text-center ${protoMono.className}`}>Daily Goals</h1>
+          <p className={`text-gray-400 text-center mb-8 ${protoMono.className}`}>
+            {new Date().toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </p>
+          <div className="grid grid-cols-3 gap-8 w-full">
+            {renderMetricCard(
+              CaloriesIcon,
+              "Calories",
+              progress.calories,
+              goals.calories,
+              "kcal"
+            )}
+            {renderMetricCard(
+              StepsIcon,
+              "Steps",
+              progress.steps,
+              goals.steps,
+              "steps"
+            )}
+            {renderMetricCard(
+              SleepIcon,
+              "Sleep",
+              progress.sleep,
+              goals.sleep,
+              "hours"
+            )}
+          </div>
         </div>
-      </footer>
+
+        {/* Weekly Progress Bars */}
+        <div className="flex-1">
+          {renderProgressBars(
+            "Calories",
+            weeklyStats.map(day => ({ date: day.date, value: day.calories })),
+            goals.calories,
+            "cal"
+          )}
+          {renderProgressBars(
+            "Steps",
+            weeklyStats.map(day => ({ date: day.date, value: day.steps })),
+            goals.steps,
+            ""
+          )}
+          {renderProgressBars(
+            "Sleep",
+            weeklyStats.map(day => ({ date: day.date, value: day.sleep })),
+            goals.sleep,
+            "h"
+          )}
+        </div>
+
+        {/* Disconnect Button */}
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleDisconnect}
+            disabled={disconnecting}
+            className={`px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-sm ${protoMono.className}`}
+          >
+            {disconnecting ? 'Disconnecting...' : 'Disconnect Google Fit'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
