@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import sdk, {
 AddFrame,
 type Context,
@@ -12,6 +12,7 @@ import { protoMono } from '../styles/fonts';
 import Image from 'next/image';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
 import '../styles/footer.css';
+import Loader from './Loader';
 
 interface WhitelistResponse {
   isWhitelisted: boolean;
@@ -32,17 +33,17 @@ export default function LivMore() {
   const [countdown, setCountdown] = useState(10);
   const router = useRouter();
 
-  const checkWhitelistStatus = async () => {
+  const checkWhitelistStatus = useCallback(async () => {
     try {
       if (!context?.user?.fid) {
-        console.log('FID no disponible en el contexto'); // Log para depuración
+        console.log('FID no disponible en el contexto');
         setIsWhitelisted(false);
         setCanUse(false);
         setIsLoading(false);
         return;
       }
 
-      console.log('Consultando whitelist con FID:', context.user.fid); // Log para depuración
+      console.log('Consultando whitelist con FID:', context.user.fid);
       const response = await fetch(`/api/whitelist/check?fid=${context.user.fid}`);
       const data: WhitelistResponse = await response.json();
       setIsWhitelisted(data.isWhitelisted);
@@ -52,7 +53,7 @@ export default function LivMore() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [context?.user?.fid]);
 
   const handleEarlyAccess = async () => {
     try {
@@ -91,7 +92,7 @@ export default function LivMore() {
       if (whitelistData.success) {
         setWhitelistInfo(
           `✨ ¡Welcome ${username}!\n` +
-          `🎉 You have been added to the whitelist.\n` +
+          `🎉 You have been added to the Wait list.\n` +
           `⏳ Redirecting to share page in ${countdown}s...`
         );
 
@@ -122,7 +123,7 @@ export default function LivMore() {
           );
         }
       } else {
-        setWhitelistInfo(`Error adding to whitelist: ${whitelistData.error}`);
+        setWhitelistInfo(`Error adding to Wait list: ${whitelistData.error}`);
       }
     } catch (error) {
       if (error instanceof AddFrame.RejectedByUser) {
@@ -182,7 +183,7 @@ export default function LivMore() {
         sdk.removeAllListeners();
       };
     }
-  }, [isSDKLoaded]);
+  }, [isSDKLoaded, checkWhitelistStatus]);
 
   // Efecto para verificar whitelist cuando el contexto cambia
   useEffect(() => {
@@ -190,7 +191,7 @@ export default function LivMore() {
       console.log("Contexto actualizado, verificando whitelist");
       checkWhitelistStatus();
     }
-  }, [context?.user?.fid]);
+  }, [context?.user?.fid, checkWhitelistStatus]);
 
   // Efecto para manejar la navegación
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function LivMore() {
   };
 
   if (isLoading) {
-    return <div>Cargando...</div>;
+    return <Loader message="Initializing..." />;
   }
 
   // Si el usuario está en whitelist pero no puede usar la app
@@ -269,7 +270,7 @@ export default function LivMore() {
             />
             
             <div className={`text-center ${protoMono.className}`}>
-              <h2 className="text-2xl font-bold mb-2">You are on the Whitelist!</h2>
+              <h2 className="text-2xl font-bold mb-2">You are on the Wait list!</h2>
               <p className="text-gray-400">We will notify you when we launch.</p>
             </div>
 
@@ -378,7 +379,7 @@ export default function LivMore() {
                   disabled={added}
                   className="w-full border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 rounded"
                 > 
-                  <span className="text-base font-semibold">Join Early Access</span>
+                  <span className="text-base font-semibold">⏰ Join the wait list⏳</span>
                 </Boton>
               </div>
 

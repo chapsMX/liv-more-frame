@@ -7,6 +7,7 @@ import sdk, { type Context } from "@farcaster/frame-sdk";
 import GoalsModal from './GoalsModal';
 import ConnectDeviceModal from './ConnectDeviceModal';
 import Image from 'next/image';
+import Loader from './Loader';
 
 interface UserGoals {
   calories_goal: number;
@@ -22,6 +23,7 @@ interface ActivityData {
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [context, setContext] = useState<Context.FrameContext>();
   const [hasGoals, setHasGoals] = useState(false);
   const [showGoalsModal, setShowGoalsModal] = useState(false);
@@ -47,6 +49,7 @@ export default function Dashboard() {
         return;
       }
 
+      setIsTransitioning(true);
       const response = await fetch(`/api/goals/check?user_fid=${userFid}`);
       const data = await response.json();
       
@@ -59,6 +62,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error checking user goals:', error);
+    } finally {
+      setIsTransitioning(false);
     }
   };
 
@@ -66,6 +71,7 @@ export default function Dashboard() {
     try {
       if (!userFid) return;
 
+      setIsTransitioning(true);
       const response = await fetch(`/api/auth/check-connection?user_fid=${userFid}`);
       const data = await response.json();
       
@@ -77,6 +83,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error checking user connection:', error);
+    } finally {
+      setIsTransitioning(false);
     }
   };
 
@@ -134,19 +142,43 @@ export default function Dashboard() {
 
   const fetchActivityData = async () => {
     try {
-      if (!userFid) return;
+      if (!userFid) {
+        console.log('No hay userFid disponible para fetchActivityData');
+        return;
+      }
 
+      console.log('Iniciando fetchActivityData para userFid:', userFid);
+      
       const response = await fetch(`/api/fitness/activity?user_fid=${userFid}`);
+      
       if (!response.ok) {
-        throw new Error('Error al obtener datos de actividad');
+        const errorText = await response.text();
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`Error al obtener datos de actividad: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      if (data.success) {
-        setActivity(data.activity);
+      console.log('Datos recibidos de actividad:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error en la respuesta del servidor');
       }
+
+      if (!data.activity) {
+        throw new Error('No se encontraron datos de actividad');
+      }
+
+      setActivity(data.activity);
+      console.log('Datos de actividad actualizados:', data.activity);
     } catch (error) {
-      console.error('Error fetching activity data:', error);
+      console.error('Error detallado en fetchActivityData:', error);
+      if (error instanceof Error) {
+        console.error('Stack trace:', error.stack);
+      }
     }
   };
 
@@ -182,7 +214,7 @@ export default function Dashboard() {
                   />
                 </div>
                 <div className={`text-xs mt-1 ${protoMono.className} text-gray-400`}>
-                  {day.value.toLocaleString()}{unit}
+                  {day.value.toLocaleString()}{title === "Calories" ? "" : unit}
                 </div>
               </div>
             );
@@ -194,22 +226,39 @@ export default function Dashboard() {
 
   const fetchWeeklyData = async () => {
     try {
-      if (!userFid) return;
-      
-      setLoading(true);
-      setError(null);
+      if (!userFid) {
+        console.log('No hay userFid disponible para fetchWeeklyData');
+        return;
+      }
+
+      console.log('Iniciando fetchWeeklyData para userFid:', userFid);
       
       const response = await fetch(`/api/fitness/weekly?user_fid=${userFid}`);
-      if (!response.ok) throw new Error('Error al obtener datos semanales');
       
-      const data = await response.json();
-      if (data.success) {
-        setWeeklyStats(data.stats);
-      } else {
-        throw new Error(data.error || 'Error al procesar datos semanales');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response weekly:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`Error al obtener datos semanales: ${response.status} ${response.statusText}`);
       }
+
+      const data = await response.json();
+      console.log('Datos recibidos semanales:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error en la respuesta del servidor');
+      }
+
+      setWeeklyStats(data.data);
+      console.log('Datos semanales actualizados:', data.data);
     } catch (error) {
-      console.error('Error fetching weekly data:', error);
+      console.error('Error detallado en fetchWeeklyData:', error);
+      if (error instanceof Error) {
+        console.error('Stack trace:', error.stack);
+      }
       setError(error instanceof Error ? error.message : 'Error al cargar datos semanales');
     } finally {
       setLoading(false);
@@ -250,30 +299,24 @@ export default function Dashboard() {
   }, [userFid]);
 
   useEffect(() => {
-    if (isConnected && userFid) {
-      fetchActivityData();
-      const interval = setInterval(fetchActivityData, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [isConnected, userFid]);
-
-  useEffect(() => {
     if (userFid) {
+      fetchActivityData();
       fetchWeeklyData();
-      const interval = setInterval(fetchWeeklyData, 300000); // 5 minutos
-      return () => clearInterval(interval);
+      const activityInterval = setInterval(fetchActivityData, 60000);
+      const weeklyInterval = setInterval(fetchWeeklyData, 300000); // 5 minutos
+      return () => {
+        clearInterval(activityInterval);
+        clearInterval(weeklyInterval);
+      };
     }
   }, [userFid]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
-          <p className={protoMono.className}>Loading...</p>
-        </div>
-      </div>
-    );
+    return <Loader message="Loading dashboard..." />;
+  }
+
+  if (isTransitioning) {
+    return <Loader message="Updating your data..." />;
   }
 
   if (!hasGoals) {
@@ -411,6 +454,18 @@ export default function Dashboard() {
 
           {/* Weekly Progress - Fila 6 */}
           <div className="mb-8">
+            <div className="text-center mb-6">
+              <h2 className={`text-xl font-bold mb-1 ${protoMono.className}`}>Weekly Activity</h2>
+              <p className={`text-gray-400 text-sm ${protoMono.className}`}>
+                {new Date(weeklyStats[0]?.date || '').toLocaleDateString('en-US', { 
+                  month: 'short',
+                  day: 'numeric'
+                })} - {new Date(weeklyStats[weeklyStats.length - 1]?.date || '').toLocaleDateString('en-US', { 
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
             {loading ? (
               <div className="flex justify-center items-center h-32">
                 <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
@@ -431,7 +486,7 @@ export default function Dashboard() {
                   "Calories",
                   weeklyStats.map(day => ({ date: day.date, value: day.calories })),
                   goals?.calories_goal || 0,
-                  "cal"
+                  ""
                 )}
                 {renderProgressBars(
                   "Steps",
@@ -455,7 +510,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-0.5">
                 <h1 className="text-2xl font-bold">Liv More</h1>
               </div>
-              <p className="text-sm leading-relaxed text-gray-300">
+              <p className="text-xs leading-relaxed text-gray-300">
                 Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.
               </p>
             </div>
