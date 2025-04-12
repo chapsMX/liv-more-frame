@@ -5,6 +5,7 @@ import sdk, {
 AddFrame,
 type Context,
 } from "@farcaster/frame-sdk";
+import { useRouter } from "next/navigation";
 
 import { Boton } from "../styles/ui/boton";
 import { protoMono } from '../styles/fonts';
@@ -12,24 +13,41 @@ import Image from 'next/image';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
 import '../styles/footer.css';
 
+interface WhitelistResponse {
+  isWhitelisted: boolean;
+  canUse: boolean;
+}
+
 export default function LivMore() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [context, setContext] = useState<Context.FrameContext>();
   const [added, setAdded] = useState(false);
   const [addFrameResult, setAddFrameResult] = useState("");
   const [whitelistInfo, setWhitelistInfo] = useState("");
-  const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
+  const [canUse, setCanUse] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showPopup, setShowPopup] = useState(false);
   const [showJustFrameItPopup, setShowJustFrameItPopup] = useState(true);
   const [countdown, setCountdown] = useState(10);
+  const [shouldNavigate, setShouldNavigate] = useState(false);
+  const router = useRouter();
 
-  const checkWhitelistStatus = async (fid: number) => {
+  const checkWhitelistStatus = async () => {
     try {
-      setIsLoading(true);
-      const response = await fetch(`/api/whitelist/check?fid=${fid}`);
-      const data = await response.json();
+      if (!context?.user?.fid) {
+        console.log('FID no disponible en el contexto'); // Log para depuración
+        setIsWhitelisted(false);
+        setCanUse(false);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Consultando whitelist con FID:', context.user.fid); // Log para depuración
+      const response = await fetch(`/api/whitelist/check?fid=${context.user.fid}`);
+      const data: WhitelistResponse = await response.json();
       setIsWhitelisted(data.isWhitelisted);
+      setCanUse(data.canUse);
     } catch (error) {
       console.error('Error checking whitelist status:', error);
     } finally {
@@ -121,33 +139,44 @@ export default function LivMore() {
   // contexto del frame
   useEffect(() => {
     const load = async () => {
-      const context = await sdk.context;
-      setContext(context);
-      setAdded(context.client.added);
+      try {
+        console.log("Iniciando carga del SDK");
+        const context = await sdk.context;
+        console.log("Contexto obtenido:", context);
+        setContext(context);
+        setAdded(context.client.added);
 
-      // Verificar whitelist si tenemos el FID
-      if (context.user?.fid) {
-        await checkWhitelistStatus(context.user.fid);
+        // Verificar whitelist si tenemos el FID
+        if (context.user?.fid) {
+          console.log("FID disponible:", context.user.fid);
+          await checkWhitelistStatus();
+        } else {
+          console.log("Esperando FID...");
+          setIsLoading(false);
+        }
+
+        sdk.on("frameAddRejected", ({ reason }) => {
+          console.log(`Frame add rejected: ${reason}`);
+        });
+
+        sdk.on("frameRemoved", () => {
+          setAdded(false);
+        });
+
+        sdk.on("primaryButtonClicked", () => {
+          console.log("primaryButtonClicked");
+        });
+
+        console.log("Calling ready");
+        sdk.actions.ready({});
+      } catch (error) {
+        console.error("Error al cargar el SDK:", error);
+        setIsLoading(false);
       }
-
-      sdk.on("frameAddRejected", ({ reason }) => {
-        console.log(`Frame add rejected: ${reason}`);
-      });
-
-      sdk.on("frameRemoved", () => {
-        setAdded(false);
-      });
-
-      sdk.on("primaryButtonClicked", () => {
-        console.log("primaryButtonClicked");
-      });
-
-      console.log("Calling ready");
-      sdk.actions.ready({});
     };
 
     if (sdk && !isSDKLoaded) {
-      console.log("Calling load");
+      console.log("Iniciando SDK");
       setIsSDKLoaded(true);
       load();
       return () => {
@@ -155,6 +184,22 @@ export default function LivMore() {
       };
     }
   }, [isSDKLoaded]);
+
+  // Efecto para verificar whitelist cuando el contexto cambia
+  useEffect(() => {
+    if (context?.user?.fid) {
+      console.log("Contexto actualizado, verificando whitelist");
+      checkWhitelistStatus();
+    }
+  }, [context?.user?.fid]);
+
+  // Efecto para manejar la navegación
+  useEffect(() => {
+    if (isWhitelisted && canUse) {
+      console.log('Redirigiendo al dashboard');
+      router.replace('/dashboard');
+    }
+  }, [isWhitelisted, canUse, router]);
 
   const handleShare = async () => {
     try {
@@ -167,17 +212,28 @@ export default function LivMore() {
     }
   };
 
-  if (!isSDKLoaded || isLoading) {
+  if (isLoading) {
+    return <div>Cargando...</div>;
+  }
+
+  // Si el usuario está en whitelist pero no puede usar la app
+  if (isWhitelisted && !canUse) {
     return (
-      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
-          <p className={protoMono.className}>Loading...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 className="text-2xl font-bold mb-4">¡Gracias por tu interés!</h1>
+        <p className="text-center mb-4">
+          Tu solicitud está siendo procesada. Te notificaremos cuando puedas acceder a la aplicación.
+        </p>
       </div>
     );
   }
 
+  // Si el usuario está en whitelist y puede usar la app
+  if (isWhitelisted && canUse) {
+    return null;
+  }
+
+  // Si el usuario no está en whitelist
   return (
     <div className="min-h-screen bg-black text-white font-mono flex flex-col">
       <main className="flex-1 flex items-center justify-center p-2">
