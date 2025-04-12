@@ -30,7 +30,6 @@ export default function LivMore() {
   const [showPopup, setShowPopup] = useState(false);
   const [showJustFrameItPopup, setShowJustFrameItPopup] = useState(true);
   const [countdown, setCountdown] = useState(10);
-  const [shouldNavigate, setShouldNavigate] = useState(false);
   const router = useRouter();
 
   const checkWhitelistStatus = async () => {
@@ -219,11 +218,32 @@ export default function LivMore() {
   // Si el usuario está en whitelist pero no puede usar la app
   if (isWhitelisted && !canUse) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <h1 className="text-2xl font-bold mb-4">¡Gracias por tu interés!</h1>
-        <p className="text-center mb-4">
-          Tu solicitud está siendo procesada. Te notificaremos cuando puedas acceder a la aplicación.
-        </p>
+      <div className="min-h-screen bg-black text-white font-mono flex flex-col">
+        <main className="flex-1 flex items-center justify-center p-2">
+          <div className="flex flex-col items-center gap-6">
+            <Image
+              src="/livMore_w.png"
+              alt="Liv More"
+              width={200}
+              height={200}
+              priority
+              className="mb-4"
+            />
+            
+            <div className={`text-center ${protoMono.className}`}>
+              <h2 className="text-2xl font-bold mb-2">Thank you for your interest!</h2>
+              <p className="text-gray-400">Your request is being processed. We will notify you when you can access the application.</p>
+            </div>
+          </div>
+        </main>
+
+        <footer className="w-full overflow-hidden py-2 mb-4">
+          <div className="relative flex flex-col gap-0.5">
+            <p className="text-center text-gray-400 text-sm">
+              made with <span className="text-red-500 text-lg">❤</span> during ETH Denver
+            </p>
+          </div>
+        </footer>
       </div>
     );
   }

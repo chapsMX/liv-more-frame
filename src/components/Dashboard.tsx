@@ -14,6 +14,12 @@ interface UserGoals {
   sleep_hours_goal: number;
 }
 
+interface ActivityData {
+  calories: number;
+  steps: number;
+  sleepHours: number;
+}
+
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [context, setContext] = useState<Context.FrameContext>();
@@ -23,15 +29,25 @@ export default function Dashboard() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [goals, setGoals] = useState<UserGoals | null>(null);
+  const [activity, setActivity] = useState<ActivityData | null>(null);
+  const [userFid, setUserFid] = useState('');
+  const [weeklyStats, setWeeklyStats] = useState<Array<{
+    date: string;
+    calories: number;
+    steps: number;
+    sleep: number;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const checkUserGoals = async () => {
     try {
-      if (!context?.user?.fid) {
-        console.log('FID no disponible en el contexto del Dashboard');
+      if (!userFid) {
+        console.log('FID no disponible en el estado del Dashboard');
         return;
       }
 
-      const response = await fetch(`/api/goals/check?user_fid=${context.user.fid}`);
+      const response = await fetch(`/api/goals/check?user_fid=${userFid}`);
       const data = await response.json();
       
       if (data.hasGoals) {
@@ -48,16 +64,15 @@ export default function Dashboard() {
 
   const checkUserConnection = async () => {
     try {
-      if (!context?.user?.fid) return;
+      if (!userFid) return;
 
-      const response = await fetch(`/api/auth/check-connection?user_fid=${context.user.fid}`);
+      const response = await fetch(`/api/auth/check-connection?user_fid=${userFid}`);
       const data = await response.json();
       
       if (data.isConnected) {
         setIsConnected(true);
         setShowConnectModal(false);
       } else if (hasGoals) {
-        // Si tiene objetivos pero no está conectado, mostramos el modal de conexión
         setShowConnectModal(true);
       }
     } catch (error) {
@@ -67,7 +82,7 @@ export default function Dashboard() {
 
   const handleSaveGoals = async (newGoals: { calories: number; steps: number; sleep: number }) => {
     try {
-      if (!context?.user?.fid) return;
+      if (!userFid) return;
 
       const response = await fetch('/api/goals/save', {
         method: 'POST',
@@ -75,7 +90,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_fid: context.user.fid,
+          user_fid: userFid,
           calories_goal: newGoals.calories,
           steps_goal: newGoals.steps,
           sleep_hours_goal: newGoals.sleep
@@ -99,9 +114,7 @@ export default function Dashboard() {
 
   const handleConnectDevice = async (provider: string) => {
     try {
-      // Por ahora solo manejamos Google Fit
       if (provider === 'google') {
-        // Aquí irá la lógica de conexión con Google Fit
         setIsConnected(true);
         setShowConnectModal(false);
       }
@@ -119,15 +132,106 @@ export default function Dashboard() {
     });
   };
 
+  const fetchActivityData = async () => {
+    try {
+      if (!userFid) return;
+
+      const response = await fetch(`/api/fitness/activity?user_fid=${userFid}`);
+      if (!response.ok) {
+        throw new Error('Error al obtener datos de actividad');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setActivity(data.activity);
+      }
+    } catch (error) {
+      console.error('Error fetching activity data:', error);
+    }
+  };
+
+  const renderProgressBars = (
+    title: string,
+    data: { date: string; value: number }[],
+    goal: number,
+    unit: string
+  ) => {
+    return (
+      <div className="mb-8">
+        <h3 className={`text-lg font-bold mb-3 ${protoMono.className}`}>{title}</h3>
+        <div className="grid grid-cols-7 gap-2">
+          {/* Days of week */}
+          {data.map((day, index) => (
+            <div key={`day-${index}`} className={`text-center ${protoMono.className}`}>
+              <div className="text-gray-500 text-xs mb-1">
+                {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+              </div>
+            </div>
+          ))}
+
+          {/* Progress bars */}
+          {data.map((day, index) => {
+            const percentage = (day.value / goal) * 100;
+            const isComplete = percentage >= 100;
+            return (
+              <div key={`bar-${index}`} className="flex flex-col items-center">
+                <div className="h-24 w-full relative flex items-end">
+                  <div 
+                    className={`w-full rounded-t-sm transition-all ${isComplete ? 'bg-green-500' : 'bg-violet-500'}`}
+                    style={{ height: `${Math.min(percentage, 100)}%` }}
+                  />
+                </div>
+                <div className={`text-xs mt-1 ${protoMono.className} text-gray-400`}>
+                  {day.value.toLocaleString()}{unit}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const fetchWeeklyData = async () => {
+    try {
+      if (!userFid) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/fitness/weekly?user_fid=${userFid}`);
+      if (!response.ok) throw new Error('Error al obtener datos semanales');
+      
+      const data = await response.json();
+      if (data.success) {
+        setWeeklyStats(data.stats);
+      } else {
+        throw new Error(data.error || 'Error al procesar datos semanales');
+      }
+    } catch (error) {
+      console.error('Error fetching weekly data:', error);
+      setError(error instanceof Error ? error.message : 'Error al cargar datos semanales');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
-        console.log("Iniciando carga del SDK en Dashboard");
         const context = await sdk.context;
-        console.log("Contexto obtenido en Dashboard:", context);
+        console.log('Dashboard context:', context);
         setContext(context);
+        
+        if (context.user?.fid) {
+          const fid = context.user.fid.toString();
+          console.log('Dashboard FID:', fid);
+          setUserFid(fid);
+        } else {
+          console.log('Esperando FID en Dashboard...');
+        }
       } catch (error) {
-        console.error("Error al cargar el SDK en Dashboard:", error);
+        console.error('Error loading dashboard:', error);
       } finally {
         setIsLoading(false);
       }
@@ -136,20 +240,30 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Efecto separado para checkUserGoals que depende del contexto
   useEffect(() => {
-    if (context?.user?.fid) {
-      console.log('Verificando objetivos con FID:', context.user.fid);
+    if (userFid) {
       checkUserGoals();
-    }
-  }, [context?.user?.fid]);
-
-  // Efecto para verificar la conexión cuando cambian los objetivos
-  useEffect(() => {
-    if (hasGoals) {
       checkUserConnection();
+      fetchActivityData();
+      fetchWeeklyData();
     }
-  }, [hasGoals]);
+  }, [userFid]);
+
+  useEffect(() => {
+    if (isConnected && userFid) {
+      fetchActivityData();
+      const interval = setInterval(fetchActivityData, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isConnected, userFid]);
+
+  useEffect(() => {
+    if (userFid) {
+      fetchWeeklyData();
+      const interval = setInterval(fetchWeeklyData, 300000); // 5 minutos
+      return () => clearInterval(interval);
+    }
+  }, [userFid]);
 
   if (isLoading) {
     return (
@@ -171,6 +285,7 @@ export default function Dashboard() {
       <ConnectDeviceModal
         onClose={() => setShowConnectModal(false)}
         onConnect={handleConnectDevice}
+        userFid={userFid}
       />
     );
   }
@@ -178,8 +293,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black text-white font-mono">
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center w-full max-w-2xl mb-2 mx-auto">
+        {/* Header - Fila 1 */}
+        <div className="flex justify-between items-center w-full max-w-2xl mb-6 mx-auto">
           <div className="flex items-center">
             <Image
               src="/livMore_w.png"
@@ -214,35 +329,33 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Main Content Box */}
-        <div className="relative border-2 border-gray-800 bg-gray-900 rounded-2xl p-4 max-w-2xl w-full mx-auto overflow-hidden mb-4war">
-          <div className={`relative z-10 text-center space-y-2 ${protoMono.className}`}>
-            <div className="flex flex-col gap-1">
-              <h1 className="text-3xl font-bold">Liv More</h1>
-            </div>
-            <p className="text-base leading-relaxed mt-2 text-gray-300">
-              Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.
-            </p>
-          </div>
-        </div>
-
         {/* Daily Activity Section */}
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className={`text-xl font-bold mb-1 ${protoMono.className}`}>Daily Activity</h2>
-          <p className="text-gray-400 text-sm mb-6">{formatDate(new Date())}</p>
+        <div className="max-w-2xl mx-auto">
+          {/* Título - Fila 2 */}
+          <h2 className={`text-xl font-bold text-center mb-1 ${protoMono.className}`}>Daily Activity</h2>
+          
+          {/* Fecha - Fila 3 */}
+          <p className="text-gray-400 text-sm mb-6 text-center">{formatDate(new Date())}</p>
 
-          <div className="grid grid-cols-3 gap-8">
+          {/* Iconos y Contadores - Fila 4 y 5 */}
+          <div className="grid grid-cols-3 gap-8 mb-6">
             {/* Calories */}
             <div className="flex flex-col items-center">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
                   <CaloriesIcon className="w-10 h-10" />
                 </div>
-                <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(50% 0 0 0)' }}></div>
+                <div 
+                  className="absolute inset-0 rounded-full border-4" 
+                  style={{ 
+                    clipPath: `inset(${activity ? 100 - (activity.calories / (goals?.calories_goal || 1) * 100) : 100}% 0 0 0)`,
+                    borderColor: activity && activity.calories >= (goals?.calories_goal || 0) ? '#22c55e' : '#f97316'
+                  }}
+                ></div>
               </div>
               <div className="mt-4 text-center">
                 <p className={`text-base font-bold ${protoMono.className}`}>
-                  <span className="text-white">0</span>
+                  <span className="text-white">{activity?.calories?.toFixed(0) || '0'}</span>
                   <span className="text-gray-500">/{goals?.calories_goal || '-'}</span>
                 </p>
                 <p className={`text-[10px] text-gray-500 uppercase tracking-wide ${protoMono.className}`}>Calories</p>
@@ -255,11 +368,17 @@ export default function Dashboard() {
                 <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
                   <StepsIcon className="w-10 h-10" />
                 </div>
-                <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(50% 0 0 0)' }}></div>
+                <div 
+                  className="absolute inset-0 rounded-full border-4" 
+                  style={{ 
+                    clipPath: `inset(${activity ? 100 - (activity.steps / (goals?.steps_goal || 1) * 100) : 100}% 0 0 0)`,
+                    borderColor: activity && activity.steps >= (goals?.steps_goal || 0) ? '#22c55e' : '#f97316'
+                  }}
+                ></div>
               </div>
               <div className="mt-4 text-center">
                 <p className={`text-base font-bold ${protoMono.className}`}>
-                  <span className="text-white">0</span>
+                  <span className="text-white">{activity?.steps?.toLocaleString() || '0'}</span>
                   <span className="text-gray-500">/{goals?.steps_goal?.toLocaleString() || '-'}</span>
                 </p>
                 <p className={`text-[10px] text-gray-500 uppercase tracking-wide ${protoMono.className}`}>Steps</p>
@@ -272,15 +391,73 @@ export default function Dashboard() {
                 <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
                   <SleepIcon className="w-10 h-10" />
                 </div>
-                <div className="absolute inset-0 rounded-full border-4 border-green-500"></div>
+                <div 
+                  className="absolute inset-0 rounded-full border-4"
+                  style={{ 
+                    clipPath: `inset(${activity ? 100 - (activity.sleepHours / (goals?.sleep_hours_goal || 1) * 100) : 100}% 0 0 0)`,
+                    borderColor: activity && activity.sleepHours >= (goals?.sleep_hours_goal || 0) ? '#22c55e' : '#f97316'
+                  }}
+                ></div>
               </div>
               <div className="mt-4 text-center">
                 <p className={`text-base font-bold ${protoMono.className}`}>
-                  <span className="text-white">0</span>
+                  <span className="text-white">{activity?.sleepHours?.toFixed(1) || '0'}</span>
                   <span className="text-gray-500">/{goals?.sleep_hours_goal || '-'}h</span>
                 </p>
                 <p className={`text-[10px] text-gray-500 uppercase tracking-wide ${protoMono.className}`}>Sleep</p>
               </div>
+            </div>
+          </div>
+
+          {/* Weekly Progress - Fila 6 */}
+          <div className="mb-8">
+            {loading ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center text-red-500">
+                <p>{error}</p>
+                <button 
+                  onClick={fetchWeeklyData}
+                  className="mt-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : (
+              <>
+                {renderProgressBars(
+                  "Calories",
+                  weeklyStats.map(day => ({ date: day.date, value: day.calories })),
+                  goals?.calories_goal || 0,
+                  "cal"
+                )}
+                {renderProgressBars(
+                  "Steps",
+                  weeklyStats.map(day => ({ date: day.date, value: day.steps })),
+                  goals?.steps_goal || 0,
+                  ""
+                )}
+                {renderProgressBars(
+                  "Sleep",
+                  weeklyStats.map(day => ({ date: day.date, value: day.sleep })),
+                  goals?.sleep_hours_goal || 0,
+                  "h"
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Cuadro de descripción - Fila 7 (Footer) */}
+          <div className="relative border-2 border-gray-800 bg-gray-900 rounded-2xl p-3 w-full overflow-hidden">
+            <div className={`relative z-10 text-center space-y-1 ${protoMono.className}`}>
+              <div className="flex flex-col gap-0.5">
+                <h1 className="text-2xl font-bold">Liv More</h1>
+              </div>
+              <p className="text-sm leading-relaxed text-gray-300">
+                Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.
+              </p>
             </div>
           </div>
         </div>
@@ -327,6 +504,7 @@ export default function Dashboard() {
         <ConnectDeviceModal
           onClose={() => setShowConnectModal(false)}
           onConnect={handleConnectDevice}
+          userFid={userFid}
         />
       )}
     </div>
