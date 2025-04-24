@@ -71,8 +71,16 @@ export async function GET(request: Request) {
 
     // 3. Obtener datos de actividad para hoy
     const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    // Ajustar a la zona horaria del usuario
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const startOfDay = new Date(today.toLocaleString('en-US', { timeZone: userTimezone }));
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    // Convertir a UTC para la API de Google
+    const startTimeMillis = startOfDay.getTime();
+    const endTimeMillis = endOfDay.getTime();
 
     // 3.1 Obtener calorías
     const caloriesResponse = await fetch(
@@ -89,8 +97,8 @@ export async function GET(request: Request) {
             dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
           }],
           bucketByTime: { durationMillis: 86400000 },
-          startTimeMillis: startOfDay.getTime(),
-          endTimeMillis: endOfDay.getTime()
+          startTimeMillis: startTimeMillis,
+          endTimeMillis: endTimeMillis
         })
       }
     );
@@ -113,8 +121,8 @@ export async function GET(request: Request) {
             dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
           }],
           bucketByTime: { durationMillis: 86400000 },
-          startTimeMillis: startOfDay.getTime(),
-          endTimeMillis: endOfDay.getTime()
+          startTimeMillis: startTimeMillis,
+          endTimeMillis: endTimeMillis
         })
       }
     );

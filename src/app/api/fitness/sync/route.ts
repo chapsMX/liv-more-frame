@@ -43,22 +43,28 @@ export async function GET(request: Request) {
     const fitness = google.fitness('v1');
 
     // Obtener la fecha actual
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
+
+    // Convertir a UTC para la API de Google
+    const startTimeMillis = startOfDay.getTime();
+    const endTimeMillis = endOfDay.getTime();
 
     // Obtener datos de actividad física
     const [stepsResponse, caloriesResponse, sleepResponse] = await Promise.all([
       fitness.users.dataSources.datasets.get({
         userId: 'me',
         dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps',
-        datasetId: `${startOfDay.getTime() * 1000000}-${endOfDay.getTime() * 1000000}`
+        datasetId: `${startTimeMillis * 1000000}-${endTimeMillis * 1000000}`
       }),
       fitness.users.dataSources.datasets.get({
         userId: 'me',
         dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended',
-        datasetId: `${startOfDay.getTime() * 1000000}-${endOfDay.getTime() * 1000000}`
+        datasetId: `${startTimeMillis * 1000000}-${endTimeMillis * 1000000}`
       }),
       fitness.users.sessions.list({
         userId: 'me',

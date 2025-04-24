@@ -17,6 +17,16 @@ export async function GET() {
         splashImageUrl: `${appUrl}/splash.png`,
         splashBackgroundColor: "#101827",
         webhookUrl: `https://api.neynar.com/f/app/51d0a8b5-4c69-4215-b709-ca9f4b8e7948/event`,
+        subtitle: `Track -> Challenge -> Earn.`,
+        description: `Gamifying wellness by integrating wearables, blockchain attestations and social challenges.`,
+        primaryCategory: `health-fitness`,
+        tags: [`health`, `biohacking`, `wearables`, `blockchain`, `challenges`],
+        heroImageUrl: `${appUrl}/hero.png`,
+        tagline: `Track -> Challenge -> Earn.`,
+        ogTitle: `Liv More`,
+        ogDescription: "Gamifying wellness by integrating wearables, blockchain attestations and social challenges.",
+        ogImageUrl: `${appUrl}/hero.png`,
+        
       },
     };
   

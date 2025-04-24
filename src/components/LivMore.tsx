@@ -17,6 +17,8 @@ import Loader from './Loader';
 interface WhitelistResponse {
   isWhitelisted: boolean;
   canUse: boolean;
+  accepted_tos: boolean;
+  accepted_privacy_policy: boolean;
 }
 
 export default function LivMore() {
@@ -31,6 +33,8 @@ export default function LivMore() {
   const [showPopup, setShowPopup] = useState(false);
   const [showJustFrameItPopup, setShowJustFrameItPopup] = useState(true);
   const [countdown, setCountdown] = useState(10);
+  const [isTermsChecked, setIsTermsChecked] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const router = useRouter();
 
   const checkWhitelistStatus = useCallback(async () => {
@@ -46,18 +50,31 @@ export default function LivMore() {
       console.log('Consultando whitelist con FID:', context.user.fid);
       const response = await fetch(`/api/whitelist/check?fid=${context.user.fid}`);
       const data: WhitelistResponse = await response.json();
+      console.log('Datos recibidos del endpoint:', data);
+      
       setIsWhitelisted(data.isWhitelisted);
       setCanUse(data.canUse);
+      setHasAcceptedTerms(data.accepted_tos && data.accepted_privacy_policy);
+      
+      // Si el usuario ya aceptó los términos, redirigir al dashboard
+      if (data.accepted_tos && data.accepted_privacy_policy) {
+        console.log('Usuario ya aceptó los términos, redirigiendo al dashboard...');
+        router.push('/dashboard');
+      } else {
+        console.log('Usuario no ha aceptado los términos o no están completos:', {
+          accepted_tos: data.accepted_tos,
+          accepted_privacy_policy: data.accepted_privacy_policy
+        });
+      }
     } catch (error) {
       console.error('Error checking whitelist status:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [context?.user?.fid]);
+  }, [context?.user?.fid, router]);
 
   const handleEarlyAccess = async () => {
     try {
-      // Primero obtenemos la info del usuario
       if (!context?.user?.fid) {
         setWhitelistInfo("No user FID found");
         return;
@@ -83,7 +100,9 @@ export default function LivMore() {
           user_fid: context.user.fid,
           username,
           eth_address: custody_address,
-          display_name
+          display_name,
+          accepted_tos: true,
+          accepted_privacy_policy: true
         }),
       });
 
@@ -133,6 +152,37 @@ export default function LivMore() {
       } else {
         setWhitelistInfo(`Error: ${error}`);
       }
+    }
+  };
+
+  const handleUpdateTerms = async () => {
+    try {
+      if (!context?.user?.fid) {
+        console.error('No user FID found');
+        return;
+      }
+
+      const response = await fetch('/api/whitelist/update-terms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_fid: context.user.fid,
+          accepted_tos: true,
+          accepted_privacy_policy: true
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        router.replace('/dashboard');
+      } else {
+        console.error('Error updating terms:', data.error);
+      }
+    } catch (error) {
+      console.error('Error updating terms:', error);
     }
   };
 
@@ -193,14 +243,6 @@ export default function LivMore() {
     }
   }, [context?.user?.fid, checkWhitelistStatus]);
 
-  // Efecto para manejar la navegación
-  useEffect(() => {
-    if (isWhitelisted && canUse) {
-      console.log('Redirigiendo al dashboard');
-      router.replace('/dashboard');
-    }
-  }, [isWhitelisted, canUse, router]);
-
   const handleShare = async () => {
     try {
       const text = "I joined the waitlist for @livmore 🧬 🧬";
@@ -214,6 +256,69 @@ export default function LivMore() {
 
   if (isLoading) {
     return <Loader message="Initializing..." />;
+  }
+
+  // Si el usuario está en whitelist y puede usar la app pero no ha aceptado los términos
+  if (isWhitelisted && canUse) {
+    return (
+      <div className="min-h-screen bg-black text-white font-mono flex flex-col">
+        <main className="flex-1 flex items-center justify-center p-2">
+          <div className="flex flex-col items-center gap-6">
+            <Image
+              src="/livMore_w.png"
+              alt="Liv More"
+              width={200}
+              height={200}
+              priority
+              className="mb-4"
+            />
+            
+            <div className={`text-center ${protoMono.className}`}>
+              <h2 className="text-2xl font-bold mb-2">Welcome back!</h2>
+              <p className="text-gray-400">Please accept our Terms of Service and Privacy Policy to continue.</p>
+            </div>
+
+            <div className="flex flex-col gap-4 w-full max-w-md">
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  type="checkbox"
+                  id="termsCheckbox"
+                  onChange={(e) => setIsTermsChecked(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <label htmlFor="termsCheckbox" className="text-sm text-gray-300">
+                  I agree to the{" "}
+                  <a
+                    href="https://livmore.life/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    Terms of Service
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="https://livmore.life/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    Privacy Policy
+                  </a>
+                </label>
+              </div>
+              <Boton
+                onClick={handleUpdateTerms}
+                disabled={!isTermsChecked}
+                className="w-full border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 rounded"
+              > 
+                <span className="text-base font-semibold">Continue to Dashboard</span>
+              </Boton>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   // Si el usuario está en whitelist pero no puede usar la app
@@ -249,156 +354,138 @@ export default function LivMore() {
     );
   }
 
-  // Si el usuario está en whitelist y puede usar la app
-  if (isWhitelisted && canUse) {
-    return null;
-  }
-
   // Si el usuario no está en whitelist
   return (
     <div className="min-h-screen bg-black text-white font-mono flex flex-col">
       <main className="flex-1 flex items-center justify-center p-2">
-        {isWhitelisted ? (
-          <div className="flex flex-col items-center gap-6">
-            <Image
-              src="/livMore_w.png"
-              alt="Liv More"
-              width={200}
-              height={200}
-              priority
-              className="mb-4"
-            />
-            
-            <div className={`text-center ${protoMono.className}`}>
-              <h2 className="text-2xl font-bold mb-2">You are on the Wait list!</h2>
-              <p className="text-gray-400">We will notify you when we launch.</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex justify-between items-center w-full max-w-2xl mb-3">
+            <div className="flex items-center">
+              <Image
+                src="/livMore_w.png"
+                alt="Liv More"
+                width={64}
+                height={64}
+                priority
+              />
             </div>
+            {context?.user && context.user.pfpUrl && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1 bg-gray-800 rounded-full text-white min-w-[150px] border-2 border-gray-700">
+                  <Image
+                    src={context.user.pfpUrl}
+                    alt="Profile"
+                    width={32}
+                    height={32}
+                    className="rounded-full border-2 border-gray-700"
+                    unoptimized
+                  />
+                  <span className={`text-base font-semibold ${protoMono.className}`}>{context.user.username}</span>
+                </div>
+              </div>
+            )}
+          </div>
 
-            <div className="flex flex-col gap-4 items-center">
+          <div className="relative border-2 border-gray-800 bg-gray-900 rounded-2xl p-0 max-w-2xl w-full overflow-hidden">
+            <div className={`relative z-10 text-center space-y-3 ${protoMono.className}`}>
+              <div className="flex flex-col gap-1">
+                <h1 className="text-4xl font-bold">Liv More</h1>
+              </div>
+              <p className="text-lg leading-relaxed mt-3 text-gray-300">Gamifying wellness by integrating wearables, blockchain attestations and social challenges.</p>
+              
+              <div className="grid grid-cols-3 gap-8 mt-8">
+                {/* Calories */}
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
+                      <CaloriesIcon className="w-10 h-10" />
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(50% 0 0 0)' }}></div>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-base font-bold"><span className="text-white">180</span><span className="text-gray-500">/350</span></p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Calories</p>
+                  </div>
+                </div>
+
+                {/* Steps */}
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
+                      <StepsIcon className="w-10 h-10" />
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(13% 0 0 0)' }}></div>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-base font-bold"><span className="text-white">6.5K</span><span className="text-gray-500">/7.5K</span></p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Steps Taken</p>
+                  </div>
+                </div>
+
+                {/* Sleep */}
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
+                      <SleepIcon className="w-10 h-10" />
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-green-500"></div>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-base font-bold"><span className="text-white">7.5h</span><span className="text-gray-500">/7h</span></p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Hours Slept</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`flex flex-col items-center gap-3 w-full max-w-2xl ${protoMono.className}`}>
+            <div className="flex flex-col gap-4 w-full">
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  type="checkbox"
+                  id="termsCheckbox"
+                  onChange={(e) => setIsTermsChecked(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <label htmlFor="termsCheckbox" className="text-sm text-gray-300">
+                  I agree to the{" "}
+                  <a
+                    href="https://livmore.life/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    Terms of Service
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="https://livmore.life/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    Privacy Policy
+                  </a>
+                </label>
+              </div>
               <Boton
-                onClick={handleShare}
-                className="mt-4 border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 px-6 rounded"
-              >
-                <span className={`text-base font-semibold ${protoMono.className}`}>Share Frame</span>
+                onClick={handleEarlyAccess}
+                disabled={added || !isTermsChecked}
+                className="w-full border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 rounded"
+              > 
+                <span className="text-base font-semibold">⏰ Join the wait list⏳</span>
               </Boton>
             </div>
+
+            <p className="text-lg text-center leading-relaxed text-white-400">
+              You will be notified when we launch!
+            </p>
           </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex justify-between items-center w-full max-w-2xl mb-3">
-              <div className="flex items-center">
-                <Image
-                  src="/livMore_w.png"
-                  alt="Liv More"
-                  width={64}
-                  height={64}
-                  priority
-                />
-              </div>
-              {context?.user && context.user.pfpUrl && (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1 bg-gray-800 rounded-full text-white min-w-[150px] border-2 border-gray-700">
-                    <Image
-                      src={context.user.pfpUrl}
-                      alt="Profile"
-                      width={32}
-                      height={32}
-                      className="rounded-full border-2 border-gray-700"
-                      unoptimized
-                    />
-                    <span className={`text-base font-semibold ${protoMono.className}`}>{context.user.username}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="relative border-2 border-gray-800 bg-gray-900 rounded-2xl p-6 max-w-2xl w-full overflow-hidden">
-              <div className={`relative z-10 text-center space-y-3 ${protoMono.className}`}>
-                <div className="flex flex-col gap-1">
-                  <h1 className="text-4xl font-bold">Liv More</h1>
-                </div>
-                {/* <p className="text-lg leading-relaxed mt-3 text-gray-300"> Maintaining a healthy lifestyle is tough. Even with fitness trackers and health data, people struggle with motivation, consistency, and accountability.</p> */}
-                <p className="text-lg leading-relaxed mt-3 text-gray-300">Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.</p>
-                
-                <div className="grid grid-cols-3 gap-8 mt-8">
-                  {/* Calories */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
-                        <CaloriesIcon className="w-10 h-10" />
-                      </div>
-                      <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(50% 0 0 0)' }}></div>
-                    </div>
-                    <div className="mt-4 text-center">
-                      <p className="text-base font-bold"><span className="text-white">180</span><span className="text-gray-500">/350</span></p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Calories</p>
-                    </div>
-                  </div>
-
-                  {/* Steps */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
-                        <StepsIcon className="w-10 h-10" />
-                      </div>
-                      <div className="absolute inset-0 rounded-full border-4 border-red-500" style={{ clipPath: 'inset(13% 0 0 0)' }}></div>
-                    </div>
-                    <div className="mt-4 text-center">
-                      <p className="text-base font-bold"><span className="text-white">6.5K</span><span className="text-gray-500">/7.5K</span></p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Steps Taken</p>
-                    </div>
-                  </div>
-
-                  {/* Sleep */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full border-4 border-gray-700 flex items-center justify-center">
-                        <SleepIcon className="w-10 h-10" />
-                      </div>
-                      <div className="absolute inset-0 rounded-full border-4 border-green-500"></div>
-                    </div>
-                    <div className="mt-4 text-center">
-                      <p className="text-base font-bold"><span className="text-white">7.5h</span><span className="text-gray-500">/7h</span></p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">Hours Slept</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className={`flex flex-col items-center gap-3 w-full max-w-2xl ${protoMono.className}`}>
-              <div className="relative">
-                <p className="text-sm text-center leading-relaxed mt-1 text-white-400">
-                  You will be notified when we launch!
-                </p>
-              </div>
-              
-              <div className="flex gap-4 w-full">
-                <Boton
-                  onClick={handleEarlyAccess}
-                  disabled={added}
-                  className="w-full border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 rounded"
-                > 
-                  <span className="text-base font-semibold">⏰ Join the wait list⏳</span>
-                </Boton>
-              </div>
-
-              <div className="w-full mt-1">
-                <div className="mb-4">
-                  {(addFrameResult || whitelistInfo) && (
-                    <div className="mb-2 text-xs text-left opacity-50 whitespace-pre-line">
-                      {whitelistInfo && whitelistInfo}
-                      {addFrameResult && `\n${addFrameResult}`}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </main>
 
-      <footer className="w-full overflow-hidden py-2 mb-4">
+      <footer className="w-full overflow-hidden py-2 mb-2">
         <div className="relative flex flex-col gap-0.5">
           <p className="text-center text-gray-400 text-sm">
             made with <span className="text-red-500 text-lg">❤</span> during ETH Denver

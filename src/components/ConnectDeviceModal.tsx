@@ -33,6 +33,13 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
       // 3. Escuchar mensajes de la ventana de autorización
       const handleMessage = async (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
+        
+        if (event.data === 'refresh') {
+          // Refrescar la aplicación
+          window.location.reload();
+          return;
+        }
+        
         if (event.data.type === 'GOOGLE_AUTH_CODE') {
           try {
             // 4. Enviar el código al endpoint de callback

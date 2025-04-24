@@ -89,11 +89,16 @@ export async function GET(request: Request) {
     }
 
     // 2. Configurar fechas para los últimos 7 días
-    const endDate = new Date();
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const endDate = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
     endDate.setHours(23, 59, 59, 999);
-    const startDate = new Date();
+    const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
+
+    // Convertir a UTC para la API de Google
+    const startTimeMillis = startDate.getTime();
+    const endTimeMillis = endDate.getTime();
 
     // 3. Obtener datos de los últimos 7 días
     const weeklyData = [];
@@ -113,8 +118,8 @@ export async function GET(request: Request) {
             dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
           }],
           bucketByTime: { durationMillis: 86400000 }, // Agrupar por día (24 horas)
-          startTimeMillis: startDate.getTime(),
-          endTimeMillis: endDate.getTime()
+          startTimeMillis: startTimeMillis,
+          endTimeMillis: endTimeMillis
         })
       }
     );
@@ -136,8 +141,8 @@ export async function GET(request: Request) {
             dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
           }],
           bucketByTime: { durationMillis: 86400000 }, // Agrupar por día (24 horas)
-          startTimeMillis: startDate.getTime(),
-          endTimeMillis: endDate.getTime()
+          startTimeMillis: startTimeMillis,
+          endTimeMillis: endTimeMillis
         })
       }
     );

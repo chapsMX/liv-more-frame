@@ -83,77 +83,72 @@ export async function GET(request: Request) {
 
     // 3. Guardar en la base de datos
     console.log('Guardando tokens en la base de datos...');
-    try {
-      const result = await sql`
-        INSERT INTO user_connections 
-          (user_fid, provider, google_token, refresh_token, token_expiry, updated_at)
-        VALUES 
-          (${userFidNumber}, 
-           'google',
-           ${tokens.access_token}, 
-           ${tokens.refresh_token},
-           ${tokens.expiry_date ? new Date(tokens.expiry_date) : null}, 
-           NOW())
-        ON CONFLICT (user_fid, provider) 
-        DO UPDATE SET 
-          google_token = EXCLUDED.google_token,
-          refresh_token = EXCLUDED.refresh_token,
-          token_expiry = EXCLUDED.token_expiry,
-          updated_at = EXCLUDED.updated_at
-        RETURNING id, user_fid, updated_at
-      `;
-      
-      console.log('Resultado de la inserción:', {
-        id: result[0]?.id,
-        user_fid: result[0]?.user_fid,
-        updated_at: result[0]?.updated_at
-      });
+    await sql`
+      INSERT INTO user_connections (
+        user_fid,
+        provider,
+        google_token,
+        refresh_token,
+        token_expiry
+      ) VALUES (
+        ${userFidNumber},
+        'google',
+        ${tokens.access_token},
+        ${tokens.refresh_token},
+        ${new Date(tokens.expiry_date!)}
+      )
+      ON CONFLICT (user_fid, provider) 
+      DO UPDATE SET
+        google_token = EXCLUDED.google_token,
+        refresh_token = EXCLUDED.refresh_token,
+        token_expiry = EXCLUDED.token_expiry,
+        updated_at = CURRENT_TIMESTAMP
+    `;
 
-      // 4. Verificar que se guardó correctamente
-      const savedConnection = await sql`
-        SELECT 
-          id, 
-          user_fid, 
-          token_expiry, 
-          updated_at,
-          google_token IS NOT NULL as has_token
-        FROM user_connections 
-        WHERE user_fid = ${userFidNumber} AND provider = 'google'
-      `;
-      
-      console.log('Verificación de guardado:', savedConnection.map(conn => ({
-        id: conn.id,
-        user_fid: conn.user_fid,
-        has_token: conn.has_token,
-        token_expiry: conn.token_expiry,
-        updated_at: conn.updated_at
-      })));
+    // 4. Devolver una página HTML que cierre la ventana y refresque la aplicación principal
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Google Fit Connection</title>
+          <script>
+            window.onload = function() {
+              // Notificar a la ventana principal que debe refrescarse
+              if (window.opener) {
+                window.opener.postMessage('refresh', '*');
+              }
+              
+              // Cerrar la ventana actual
+              window.close();
+              
+              // Si la ventana no se cierra (por ejemplo, en Safari), redirigir a la aplicación principal
+              setTimeout(function() {
+                window.location.href = '${process.env.NEXT_PUBLIC_URL}';
+              }, 1000);
+            }
+          </script>
+        </head>
+        <body>
+          <div style="text-align: center; margin-top: 50px;">
+            <h2>Google Fit connection successful!</h2>
+            <p>You can close this window and return to the application.</p>
+          </div>
+        </body>
+      </html>
+    `;
 
-      return NextResponse.json({ 
-        success: true,
-        message: 'Tokens guardados correctamente',
-        data: {
-          user_fid: userFidNumber,
-          updated_at: result[0]?.updated_at
-        }
-      });
-
-    } catch (dbError) {
-      console.error('Error al guardar en la base de datos:', dbError);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Error al guardar la conexión',
-        details: dbError instanceof Error ? dbError.message : 'Error desconocido'
-      }, { status: 500 });
-    }
+    return new Response(html, {
+      headers: {
+        'Content-Type': 'text/html',
+      },
+    });
 
   } catch (error) {
-    console.error('Error general en el callback:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Error al procesar la autenticación',
-      details: error instanceof Error ? error.message : 'Error desconocido'
-    }, { status: 500 });
+    console.error('Error en el callback de Google:', error);
+    return NextResponse.json(
+      { success: false, error: 'Error al procesar la autenticación' },
+      { status: 500 }
+    );
   }
 }
 

@@ -14,7 +14,9 @@ export async function GET(request: Request) {
       console.log('No se encontró FID en la URL'); // Log para depuración
       return NextResponse.json({
         isWhitelisted: false,
-        canUse: false
+        canUse: false,
+        accepted_tos: false,
+        accepted_privacy_policy: false
       });
     }
 
@@ -23,14 +25,16 @@ export async function GET(request: Request) {
       console.log('FID no es un número válido:', fid); // Log para depuración
       return NextResponse.json({
         isWhitelisted: false,
-        canUse: false
+        canUse: false,
+        accepted_tos: false,
+        accepted_privacy_policy: false
       });
     }
 
     console.log('Consultando base de datos con FID:', fidNumber); // Log para depuración
     
     const result = await sql`
-      SELECT is_whitelisted, can_use 
+      SELECT is_whitelisted, can_use, accepted_tos, accepted_privacy_policy 
       FROM whitelist_users 
       WHERE user_fid = ${fidNumber}
     `;
@@ -40,13 +44,17 @@ export async function GET(request: Request) {
     if (result.length === 0) {
       return NextResponse.json({
         isWhitelisted: false,
-        canUse: false
+        canUse: false,
+        accepted_tos: false,
+        accepted_privacy_policy: false
       });
     }
 
     return NextResponse.json({
       isWhitelisted: result[0].is_whitelisted,
-      canUse: result[0].can_use
+      canUse: result[0].can_use,
+      accepted_tos: result[0].accepted_tos,
+      accepted_privacy_policy: result[0].accepted_privacy_policy
     });
   } catch (error) {
     console.error('Error checking whitelist status:', error);

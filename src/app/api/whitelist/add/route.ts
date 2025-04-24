@@ -14,8 +14,8 @@ export async function POST(request: Request) {
 
     // Insertar en la base de datos
     await sql(
-      'INSERT INTO whitelist_users (user_fid, username, eth_address, display_name, is_whitelisted) VALUES ($1, $2, $3, $4, $5)',
-      [user_fid, username, eth_address, display_name, true]
+      'INSERT INTO whitelist_users (user_fid, username, eth_address, display_name, is_whitelisted, can_use, accepted_tos, accepted_privacy_policy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [user_fid, username, eth_address, display_name, true, false, true, true]
     );
 
     return NextResponse.json({ 

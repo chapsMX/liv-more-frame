@@ -335,9 +335,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white font-mono">
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-2 py-0">
         {/* Header - Fila 1 */}
-        <div className="flex justify-between items-center w-full max-w-2xl mb-6 mx-auto">
+        <div className="flex justify-between items-center w-full max-w-2xl mb-0 mx-auto">
           <div className="flex items-center">
             <Image
               src="/livMore_w.png"
@@ -375,13 +375,13 @@ export default function Dashboard() {
         {/* Daily Activity Section */}
         <div className="max-w-2xl mx-auto">
           {/* Título - Fila 2 */}
-          <h2 className={`text-xl font-bold text-center mb-1 ${protoMono.className}`}>Daily Activity</h2>
+          <h2 className={`text-xl font-bold text-center mb-0 ${protoMono.className}`}>Daily Activity</h2>
           
           {/* Fecha - Fila 3 */}
-          <p className="text-gray-400 text-sm mb-6 text-center">{formatDate(new Date())}</p>
+          <p className="text-gray-400 text-sm mb-2 text-center">{formatDate(new Date())}</p>
 
           {/* Iconos y Contadores - Fila 4 y 5 */}
-          <div className="grid grid-cols-3 gap-8 mb-6">
+          <div className="grid grid-cols-3 gap-8 mb-4">
             {/* Calories */}
             <div className="flex flex-col items-center">
               <div className="relative">
@@ -453,8 +453,8 @@ export default function Dashboard() {
           </div>
 
           {/* Weekly Progress - Fila 6 */}
-          <div className="mb-8">
-            <div className="text-center mb-6">
+          <div className="mb-2">
+            <div className="text-center mb-0">
               <h2 className={`text-xl font-bold mb-1 ${protoMono.className}`}>Weekly Activity</h2>
               <p className={`text-gray-400 text-sm ${protoMono.className}`}>
                 {new Date(weeklyStats[0]?.date || '').toLocaleDateString('en-US', { 
@@ -511,7 +511,7 @@ export default function Dashboard() {
                 <h1 className="text-2xl font-bold">Liv More</h1>
               </div>
               <p className="text-xs leading-relaxed text-gray-300">
-                Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.
+              Gamifying wellness by integrating wearables, blockchain attestations and social challenges.
               </p>
             </div>
           </div>
