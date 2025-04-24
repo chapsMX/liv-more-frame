@@ -29,6 +29,11 @@ interface GoogleFitResponse {
   bucket?: GoogleFitBucket[];
 }
 
+async function refreshToken(oauth2Client: OAuth2Client) {
+  const response = await oauth2Client.getAccessToken();
+  return response.token;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -49,38 +54,56 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User not connected to Google Fit' }, { status: 401 });
     }
 
-    const { access_token, refresh_token, token_expiry } = tokensResult[0];
+    const { token_expiry, refresh_token } = tokensResult[0];
+    let { access_token } = tokensResult[0];
 
     // Verificar si el token ha expirado
     if (new Date(token_expiry) < new Date()) {
-      // Aquí deberíamos implementar la lógica para refrescar el token
-      return NextResponse.json({ error: 'Token expired' }, { status: 401 });
+      try {
+        const oauth2Client = new OAuth2Client(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          process.env.GOOGLE_REDIRECT_URI
+        );
+
+        oauth2Client.setCredentials({
+          refresh_token: refresh_token
+        });
+
+        const newToken = await refreshToken(oauth2Client);
+        
+        // Actualizar tokens en la base de datos
+        await sql`
+          UPDATE user_connections
+          SET google_token = ${newToken!},
+              token_expiry = ${new Date(Date.now() + 3600000)}
+          WHERE user_fid = ${user_fid} AND provider = 'google'
+        `;
+
+        access_token = newToken!;
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+        return NextResponse.json({ error: 'Failed to refresh token' }, { status: 401 });
+      }
     }
 
-    // 2. Crear cliente OAuth2
-    const oauth2Client = new OAuth2Client(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-
-    oauth2Client.setCredentials({
-      access_token,
-      refresh_token
-    });
-
     // 3. Obtener datos de actividad para hoy
-    const today = new Date();
-    // Ajustar a la zona horaria del usuario
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const startOfDay = new Date(today.toLocaleString('en-US', { timeZone: userTimezone }));
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
 
     // Convertir a UTC para la API de Google
     const startTimeMillis = startOfDay.getTime();
     const endTimeMillis = endOfDay.getTime();
+
+    console.log('Consultando datos de actividad:', {
+      startTime: new Date(startTimeMillis).toISOString(),
+      endTime: new Date(endTimeMillis).toISOString(),
+      timezone: userTimezone
+    });
 
     // 3.1 Obtener calorías
     const caloriesResponse = await fetch(
@@ -96,15 +119,21 @@ export async function GET(request: Request) {
             dataTypeName: 'com.google.calories.expended',
             dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
           }],
-          bucketByTime: { durationMillis: 86400000 },
+          bucketByTime: { durationMillis: endTimeMillis - startTimeMillis },
           startTimeMillis: startTimeMillis,
           endTimeMillis: endTimeMillis
         })
       }
     );
 
+    if (!caloriesResponse.ok) {
+      const errorData = await caloriesResponse.text();
+      console.error('Error en respuesta de calorías:', errorData);
+      throw new Error(`Error al obtener calorías: ${caloriesResponse.status}`);
+    }
+
     const caloriesData: GoogleFitResponse = await caloriesResponse.json();
-    const calories = caloriesData.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.fpVal || 0;
+    console.log('Datos de calorías recibidos:', caloriesData);
 
     // 3.2 Obtener pasos
     const stepsResponse = await fetch(
@@ -120,50 +149,76 @@ export async function GET(request: Request) {
             dataTypeName: 'com.google.step_count.delta',
             dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
           }],
-          bucketByTime: { durationMillis: 86400000 },
+          bucketByTime: { durationMillis: endTimeMillis - startTimeMillis },
           startTimeMillis: startTimeMillis,
           endTimeMillis: endTimeMillis
         })
       }
     );
 
+    if (!stepsResponse.ok) {
+      const errorData = await stepsResponse.text();
+      console.error('Error en respuesta de pasos:', errorData);
+      throw new Error(`Error al obtener pasos: ${stepsResponse.status}`);
+    }
+
     const stepsData: GoogleFitResponse = await stepsResponse.json();
-    const steps = stepsData.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.intVal || 0;
+    console.log('Datos de pasos recibidos:', stepsData);
 
     // 3.3 Obtener horas de sueño
     const sleepResponse = await fetch(
-      `https://www.googleapis.com/fitness/v1/users/me/sessions`,
+      `https://www.googleapis.com/fitness/v1/users/me/sessions?activityType=72&startTime=${startOfDay.toISOString()}&endTime=${endOfDay.toISOString()}`,
       {
-        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${access_token}`
         }
       }
     );
 
-    const sleepData: GoogleFitSleepData = await sleepResponse.json();
-    const todaySleep = sleepData.session?.filter((session: GoogleFitSession) => {
-      const startTime = new Date(Number(session.startTimeMillis));
-      return startTime >= startOfDay && startTime < endOfDay && 
-             session.activityType === 72; // 72 es el tipo de actividad para dormir
-    });
+    if (!sleepResponse.ok) {
+      const errorData = await sleepResponse.text();
+      console.error('Error en respuesta de sueño:', errorData);
+      throw new Error(`Error al obtener sueño: ${sleepResponse.status}`);
+    }
 
-    const sleepHours = todaySleep?.reduce((total: number, session: GoogleFitSession) => {
+    const sleepData: GoogleFitSleepData = await sleepResponse.json();
+    console.log('Datos de sueño recibidos:', sleepData);
+
+    // Procesar los datos
+    const calories = Math.round(caloriesData.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.fpVal || 0);
+    const steps = stepsData.bucket?.[0]?.dataset?.[0]?.point?.[0]?.value?.[0]?.intVal || 0;
+    
+    const sleepHours = sleepData.session?.reduce((total: number, session: GoogleFitSession) => {
       const duration = (Number(session.endTimeMillis) - Number(session.startTimeMillis)) / (1000 * 60 * 60);
       return total + duration;
     }, 0) || 0;
 
-    return NextResponse.json({
+    // Guardar los datos en la base de datos
+    await sql`
+      INSERT INTO daily_activities (user_fid, date, steps, calories, sleep_hours)
+      VALUES (${user_fid}, ${now.toISOString().split('T')[0]}, ${steps}, ${calories}, ${sleepHours})
+      ON CONFLICT (user_fid, date) 
+      DO UPDATE SET 
+        steps = ${steps},
+        calories = ${calories},
+        sleep_hours = ${sleepHours},
+        updated_at = NOW()
+    `;
+
+    const response = {
       success: true,
       activity: {
         calories,
         steps,
-        sleepHours
+        sleepHours: Math.round(sleepHours * 10) / 10 // Redondear a 1 decimal
       }
-    });
+    };
+
+    console.log('Respuesta final:', response);
+    return NextResponse.json(response);
+
   } catch (error) {
-    console.error('Error fetching activity data:', error);
+    console.error('Error detallado en fetchActivityData:', error);
     return NextResponse.json({ 
       error: 'Error fetching activity data',
       details: error instanceof Error ? error.message : 'Unknown error'

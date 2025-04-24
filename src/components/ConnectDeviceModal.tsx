@@ -31,46 +31,19 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
       }
 
       // 3. Escuchar mensajes de la ventana de autorización
-      const handleMessage = async (event: MessageEvent) => {
+      const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         
         if (event.data === 'refresh') {
-          // Refrescar la aplicación
+          // Limpiar el listener
+          window.removeEventListener('message', handleMessage);
+          // Notificar éxito
+          onConnect('google');
+          // Cerrar el modal
+          onClose();
+          // Recargar la aplicación
           window.location.reload();
           return;
-        }
-        
-        if (event.data.type === 'GOOGLE_AUTH_CODE') {
-          try {
-            // 4. Enviar el código al endpoint de callback
-            const callbackResponse = await fetch('/auth/callback', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-user-fid': userFid
-              },
-              body: JSON.stringify({ code: event.data.code })
-            });
-
-            if (!callbackResponse.ok) {
-              const error = await callbackResponse.json();
-              throw new Error(error.error || 'Error al procesar la autorización');
-            }
-
-            const result = await callbackResponse.json();
-            if (result.success) {
-              onConnect('google');
-              onClose();
-            } else {
-              throw new Error(result.error || 'Error al conectar con Google Fit');
-            }
-          } catch (error) {
-            console.error('Error en el callback:', error);
-            alert(error instanceof Error ? error.message : 'Error al conectar con Google Fit');
-          } finally {
-            window.removeEventListener('message', handleMessage);
-            setIsConnecting(false);
-          }
         }
       };
 

@@ -116,22 +116,31 @@ export async function GET(request: Request) {
               // Notificar a la ventana principal que debe refrescarse
               if (window.opener) {
                 window.opener.postMessage('refresh', '*');
+                window.close();
+              } else {
+                // Si no hay ventana principal, redirigir a la aplicación
+                window.location.href = '${process.env.NEXT_PUBLIC_URL}/dashboard';
               }
-              
-              // Cerrar la ventana actual
-              window.close();
-              
-              // Si la ventana no se cierra (por ejemplo, en Safari), redirigir a la aplicación principal
-              setTimeout(function() {
-                window.location.href = '${process.env.NEXT_PUBLIC_URL}';
-              }, 1000);
             }
           </script>
         </head>
         <body>
-          <div style="text-align: center; margin-top: 50px;">
-            <h2>Google Fit connection successful!</h2>
-            <p>You can close this window and return to the application.</p>
+          <div style="text-align: center; margin-top: 50px; font-family: system-ui, -apple-system, sans-serif;">
+            <h2 style="color: #4CAF50;">¡Conexión exitosa!</h2>
+            <p>Puedes cerrar esta ventana y volver a la aplicación.</p>
+            <button onclick="window.close()" style="
+              background-color: #4CAF50;
+              border: none;
+              color: white;
+              padding: 15px 32px;
+              text-align: center;
+              text-decoration: none;
+              display: inline-block;
+              font-size: 16px;
+              margin: 4px 2px;
+              cursor: pointer;
+              border-radius: 4px;
+            ">Cerrar ventana</button>
           </div>
         </body>
       </html>

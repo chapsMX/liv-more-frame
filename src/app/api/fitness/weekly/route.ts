@@ -90,8 +90,14 @@ export async function GET(request: Request) {
 
     // 2. Configurar fechas para los últimos 7 días
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const endDate = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    
+    // Configurar el fin del período (ayer a las 23:59:59.999)
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() - 1);
     endDate.setHours(23, 59, 59, 999);
+    
+    // Configurar el inicio del período (7 días antes del fin)
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
