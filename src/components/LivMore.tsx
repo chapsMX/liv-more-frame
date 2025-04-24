@@ -34,7 +34,6 @@ export default function LivMore() {
   const [showJustFrameItPopup, setShowJustFrameItPopup] = useState(true);
   const [countdown, setCountdown] = useState(10);
   const [isTermsChecked, setIsTermsChecked] = useState(false);
-  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const router = useRouter();
 
   const checkWhitelistStatus = useCallback(async () => {
@@ -54,7 +53,6 @@ export default function LivMore() {
       
       setIsWhitelisted(data.isWhitelisted);
       setCanUse(data.canUse);
-      setHasAcceptedTerms(data.accepted_tos && data.accepted_privacy_policy);
       
       // Si el usuario ya aceptó los términos, redirigir al dashboard
       if (data.accepted_tos && data.accepted_privacy_policy) {
