@@ -49,6 +49,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const user_fid = searchParams.get('user_fid');
+    const timezone = searchParams.get('timezone') || 'UTC';
 
     if (!user_fid) {
       return NextResponse.json({ error: 'user_fid is required' }, { status: 400 });
@@ -89,22 +90,30 @@ export async function GET(request: Request) {
     }
 
     // 2. Configurar fechas para los últimos 7 días
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    const now = new Date();
     
-    // Configurar el fin del período (ayer a las 23:59:59.999)
-    const endDate = new Date(now);
-    endDate.setDate(endDate.getDate() - 1);
+    // Convertir a la zona horaria del usuario
+    const userDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    
+    // Configurar el fin del período (hoy a las 23:59:59.999 en hora local)
+    const endDate = new Date(userDate);
     endDate.setHours(23, 59, 59, 999);
     
-    // Configurar el inicio del período (7 días antes del fin)
+    // Configurar el inicio del período (6 días antes del fin)
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
 
-    // Convertir a UTC para la API de Google
+    // Convertir a timestamps para la API de Google
     const startTimeMillis = startDate.getTime();
     const endTimeMillis = endDate.getTime();
+
+    console.log('Consultando datos semanales:', {
+      startTime: new Date(startTimeMillis).toISOString(),
+      endTime: new Date(endTimeMillis).toISOString(),
+      timezone: timezone,
+      userLocalTime: userDate.toLocaleString('en-US', { timeZone: timezone })
+    });
 
     // 3. Obtener datos de los últimos 7 días
     const weeklyData = [];

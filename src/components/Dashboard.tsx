@@ -149,7 +149,8 @@ export default function Dashboard() {
 
       console.log('Iniciando fetchActivityData para userFid:', userFid);
       
-      const response = await fetch(`/api/fitness/activity?user_fid=${userFid}`);
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const response = await fetch(`/api/fitness/activity?user_fid=${userFid}&timezone=${encodeURIComponent(userTimezone)}`);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -189,8 +190,8 @@ export default function Dashboard() {
     unit: string
   ) => {
     return (
-      <div className="mb-8">
-        <h3 className={`text-lg font-bold mb-3 ${protoMono.className}`}>{title}</h3>
+      <div className="mb-2">
+        <h3 className={`text-lg font-bold mb-2 ${protoMono.className}`}>{title}</h3>
         <div className="grid grid-cols-7 gap-2">
           {/* Days of week */}
           {data.map((day, index) => (
@@ -233,7 +234,8 @@ export default function Dashboard() {
 
       console.log('Iniciando fetchWeeklyData para userFid:', userFid);
       
-      const response = await fetch(`/api/fitness/weekly?user_fid=${userFid}`);
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const response = await fetch(`/api/fitness/weekly?user_fid=${userFid}&timezone=${encodeURIComponent(userTimezone)}`);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -335,7 +337,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white font-mono">
-      <main className="container mx-auto px-2 py-0">
+      <main className="container mx-auto px-2 py-2">
         {/* Header - Fila 1 */}
         <div className="flex justify-between items-center w-full max-w-2xl mb-0 mx-auto">
           <div className="flex items-center">

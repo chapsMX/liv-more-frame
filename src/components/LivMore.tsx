@@ -259,9 +259,9 @@ export default function LivMore() {
   // Si el usuario está en whitelist y puede usar la app pero no ha aceptado los términos
   if (isWhitelisted && canUse) {
     return (
-      <div className="min-h-screen bg-black text-white font-mono flex flex-col">
-        <main className="flex-1 flex items-center justify-center p-2">
-          <div className="flex flex-col items-center gap-6">
+      <div className="min-h-screen bg-black text-white font-mono">
+      <main className="container mx-auto px-2 py-2">
+          <div className="flex flex-col items-center gap-2">
             <Image
               src="/livMore_w.png"
               alt="Liv More"
@@ -322,8 +322,8 @@ export default function LivMore() {
   // Si el usuario está en whitelist pero no puede usar la app
   if (isWhitelisted && !canUse) {
     return (
-      <div className="min-h-screen bg-black text-white font-mono flex flex-col">
-        <main className="flex-1 flex items-center justify-center p-2">
+      <div className="min-h-screen bg-black text-white font-mono">
+      <main className="container mx-auto px-2 py-2">
           <div className="flex flex-col items-center gap-6">
             <Image
               src="/livMore_w.png"
@@ -354,8 +354,8 @@ export default function LivMore() {
 
   // Si el usuario no está en whitelist
   return (
-    <div className="min-h-screen bg-black text-white font-mono flex flex-col">
-      <main className="flex-1 flex items-center justify-center p-2">
+    <div className="min-h-screen bg-black text-white font-mono">
+      <main className="container mx-auto px-2 py-2">
         <div className="flex flex-col items-center gap-3">
           <div className="flex justify-between items-center w-full max-w-2xl mb-3">
             <div className="flex items-center">

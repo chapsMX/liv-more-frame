@@ -38,6 +38,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const user_fid = searchParams.get('user_fid');
+    const timezone = searchParams.get('timezone') || 'UTC';
 
     if (!user_fid) {
       return NextResponse.json({ error: 'user_fid is required' }, { status: 400 });
@@ -88,21 +89,24 @@ export async function GET(request: Request) {
     }
 
     // 3. Obtener datos de actividad para hoy
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
-    const startOfDay = new Date(now);
+    const now = new Date();
+    
+    // Convertir a la zona horaria del usuario
+    const userDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const startOfDay = new Date(userDate);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
+    const endOfDay = new Date(userDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Convertir a UTC para la API de Google
+    // Convertir a timestamps para la API de Google
     const startTimeMillis = startOfDay.getTime();
     const endTimeMillis = endOfDay.getTime();
 
     console.log('Consultando datos de actividad:', {
       startTime: new Date(startTimeMillis).toISOString(),
       endTime: new Date(endTimeMillis).toISOString(),
-      timezone: userTimezone
+      timezone: timezone,
+      userLocalTime: userDate.toLocaleString('en-US', { timeZone: timezone })
     });
 
     // 3.1 Obtener calorías

@@ -26,6 +26,7 @@ export async function GET() {
         ogTitle: `Liv More`,
         ogDescription: "Gamifying wellness by integrating wearables, blockchain attestations and social challenges.",
         ogImageUrl: `${appUrl}/hero.png`,
+        screenshotUrls: [`${appUrl}/lm_01.jpg`, `${appUrl}/lm_02.jpg`, `${appUrl}/lm_04.jpg`],
         
       },
     };
