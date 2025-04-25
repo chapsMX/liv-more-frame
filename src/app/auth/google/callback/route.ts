@@ -92,16 +92,16 @@ export async function GET(request: Request) {
         token_expiry
       ) VALUES (
         ${userFidNumber},
-        'google',
-        ${tokens.access_token},
-        ${tokens.refresh_token},
+           'google',
+           ${tokens.access_token}, 
+           ${tokens.refresh_token},
         ${new Date(tokens.expiry_date!)}
       )
-      ON CONFLICT (user_fid, provider) 
-      DO UPDATE SET
-        google_token = EXCLUDED.google_token,
-        refresh_token = EXCLUDED.refresh_token,
-        token_expiry = EXCLUDED.token_expiry,
+        ON CONFLICT (user_fid, provider) 
+        DO UPDATE SET 
+          google_token = EXCLUDED.google_token,
+          refresh_token = EXCLUDED.refresh_token,
+          token_expiry = EXCLUDED.token_expiry,
         updated_at = CURRENT_TIMESTAMP
     `;
 
