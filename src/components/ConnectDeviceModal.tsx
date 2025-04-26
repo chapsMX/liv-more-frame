@@ -10,16 +10,21 @@ interface ConnectDeviceModalProps {
 }
 
 export default function ConnectDeviceModal({ onClose, onConnect, userFid }: ConnectDeviceModalProps) {
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+  const [isConnectingGarmin, setIsConnectingGarmin] = useState(false);
 
   const handleGoogleConnect = async () => {
     try {
-      setIsConnecting(true);
+      setIsConnectingGoogle(true);
+      console.log('Iniciando conexión con Google...');
       
-      // 1. Obtener la URL de autorización
       const response = await fetch(`/auth/google/connect?user_fid=${userFid}`);
+      console.log('Respuesta de Google:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Error al obtener la URL de autorización');
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+        throw new Error(`Error al obtener la URL de autorización: ${errorData}`);
       }
       
       const { url } = await response.json();
@@ -51,18 +56,23 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
     } catch (error) {
       console.error('Error al conectar con Google:', error);
       alert(error instanceof Error ? error.message : 'Error al conectar con Google Fit');
-      setIsConnecting(false);
+    } finally {
+      setIsConnectingGoogle(false);
     }
   };
 
   const handleGarminConnect = async () => {
     try {
-      setIsConnecting(true);
+      setIsConnectingGarmin(true);
+      console.log('Iniciando conexión con Garmin...');
       
-      // 1. Obtener la URL de autorización
       const response = await fetch(`/auth/garmin/connect?user_fid=${userFid}`);
+      console.log('Respuesta de Garmin:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Error al obtener la URL de autorización');
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
+        throw new Error(`Error al obtener la URL de autorización: ${errorData}`);
       }
       
       const { url } = await response.json();
@@ -94,7 +104,8 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
     } catch (error) {
       console.error('Error al conectar con Garmin:', error);
       alert(error instanceof Error ? error.message : 'Error al conectar con Garmin');
-      setIsConnecting(false);
+    } finally {
+      setIsConnectingGarmin(false);
     }
   };
 
@@ -114,34 +125,34 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
         </div>
 
         <div className="space-y-8">
-          <p className={`text-gray-300 ${protoMono.className}`}>
-            Now you need to connect your wearable device. This is how we will track your physical activities.
+          <p className={`text-gray-300 text-center ${protoMono.className}`}>
+            Select your activity data provider to continue
           </p>
 
           <div className="grid grid-cols-1 gap-4">
             <button
               onClick={handleGoogleConnect}
-              disabled={isConnecting}
-              className={`p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center border-2 border-orange-500 ${protoMono.className} ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isConnectingGoogle || isConnectingGarmin}
+              className={`p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center border-2 border-orange-500 ${protoMono.className} ${isConnectingGoogle ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <span className="text-white">
-                {isConnecting ? 'Connecting...' : 'Google Fit'}
+                {isConnectingGoogle ? 'Connecting...' : 'Fitness Google'}
               </span>
             </button>
             <button
               onClick={handleGarminConnect}
-              disabled={isConnecting}
-              className={`p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center border-2 border-orange-500 ${protoMono.className} ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isConnectingGarmin || isConnectingGoogle}
+              className={`p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center border-2 border-orange-500 ${protoMono.className} ${isConnectingGarmin ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <span className="text-white">
-                {isConnecting ? 'Connecting...' : 'Garmin'}
+                {isConnectingGarmin ? 'Connecting...' : 'Garmin Connect'}
               </span>
             </button>
             <button
               disabled
               className={`p-4 bg-gray-800 opacity-50 cursor-not-allowed rounded-xl text-center border-2 border-gray-700 ${protoMono.className}`}
             >
-              <span className="text-gray-500">Oura (Coming Soon)</span>
+              <span className="text-gray-500">Oura Ring (Coming Soon)</span>
             </button>
             <button
               disabled
@@ -151,7 +162,7 @@ export default function ConnectDeviceModal({ onClose, onConnect, userFid }: Conn
             </button>
           </div>
 
-          <p className={`text-gray-400 text-sm ${protoMono.className}`}>
+          <p className={`text-gray-400 text-sm text-center ${protoMono.className}`}>
             * We only collect basic activity data and do not access any sensitive information about your health habits.
           </p>
         </div>

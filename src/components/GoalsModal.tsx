@@ -1,96 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from 'react';
 import { protoMono } from '../styles/fonts';
-import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
+import { Boton } from "../styles/ui/boton";
+import sdk from "@farcaster/frame-sdk";
 
 interface GoalsModalProps {
-  onSave: (goals: { calories: number; steps: number; sleep: number }) => void;
+  onSave: (goals: { calories: number; steps: number; sleep: number }) => Promise<void>;
 }
 
 export default function GoalsModal({ onSave }: GoalsModalProps) {
-  const [calories, setCalories] = useState(350);
-  const [steps, setSteps] = useState(7500);
-  const [sleep, setSleep] = useState(7);
+  const [goals, setGoals] = useState({
+    calories: 350,
+    steps: 7500,
+    sleep: 7
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Indicar que el modal está listo para ser mostrado
+    sdk.actions.ready();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      calories,
-      steps,
-      sleep
-    });
+    await onSave(goals);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-[#1C1F2A] p-8 rounded-3xl w-full max-w-md">
-        <h2 className={`text-2xl font-bold mb-2 text-white ${protoMono.className}`}>
-          Set your Daily Goals
-        </h2>
-        
-        <p className={`text-gray-300 mb-8 ${protoMono.className}`}>
-          To use LivMore, you need to set your daily goals first. These goals will help you track your daily progress and can be modified at any time.
-        </p>
+    <div className="min-h-screen bg-black text-white font-mono">
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-md mx-auto">
+          <h1 className={`text-2xl font-bold mb-6 text-center ${protoMono.className}`}>
+            Configura tus objetivos diarios
+          </h1>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Calorías a quemar (kcal)
+                </label>
+                <input
+                  type="number"
+                  value={goals.calories}
+                  onChange={(e) => setGoals(prev => ({ ...prev, calories: Number(e.target.value) }))}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-violet-500"
+                  min="100"
+                  max="1000"
+                />
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Calories Goal */}
-          <div>
-            <label className="flex items-center mb-2 text-white">
-              <CaloriesIcon className="w-6 h-6 mr-2 text-white" />
-              <span className={`${protoMono.className}`}>Daily Calories Goal</span>
-            </label>
-            <input
-              type="number"
-              value={calories}
-              onChange={(e) => setCalories(parseInt(e.target.value))}
-              className="w-full p-3 bg-[#2A2F3E] rounded-lg text-white"
-              min="0"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Pasos diarios
+                </label>
+                <input
+                  type="number"
+                  value={goals.steps}
+                  onChange={(e) => setGoals(prev => ({ ...prev, steps: Number(e.target.value) }))}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-violet-500"
+                  min="1000"
+                  max="20000"
+                  step="500"
+                />
+              </div>
 
-          {/* Steps Goal */}
-          <div>
-            <label className="flex items-center mb-2 text-white">
-              <StepsIcon className="w-6 h-6 mr-2 text-white" />
-              <span className={`${protoMono.className}`}>Daily Steps Goal</span>
-            </label>
-            <input
-              type="number"
-              value={steps}
-              onChange={(e) => setSteps(parseInt(e.target.value))}
-              className="w-full p-3 bg-[#2A2F3E] rounded-lg text-white"
-              min="0"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Horas de sueño
+                </label>
+                <input
+                  type="number"
+                  value={goals.sleep}
+                  onChange={(e) => setGoals(prev => ({ ...prev, sleep: Number(e.target.value) }))}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-violet-500"
+                  min="4"
+                  max="12"
+                  step="0.5"
+                />
+              </div>
+            </div>
 
-          {/* Sleep Goal */}
-          <div>
-            <label className="flex items-center mb-2 text-white">
-              <SleepIcon className="w-6 h-6 mr-2 text-white" />
-              <span className={`${protoMono.className}`}>Daily Sleep Hours Goal</span>
-            </label>
-            <input
-              type="number"
-              value={sleep}
-              onChange={(e) => setSleep(parseFloat(e.target.value))}
-              className="w-full p-3 bg-[#2A2F3E] rounded-lg text-white"
-              min="0"
-              step="0.5"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className={`w-full mt-8 bg-violet-500 text-white py-4 px-6 rounded-xl hover:bg-violet-600 transition-colors ${protoMono.className}`}
-          >
-            Save Goals
-          </button>
-        </form>
-      </div>
+            <Boton
+              type="submit"
+              className="w-full py-3 bg-violet-600 hover:bg-violet-700 rounded-xl"
+            >
+              Guardar Objetivos
+            </Boton>
+          </form>
+        </div>
+      </main>
     </div>
   );
 } 

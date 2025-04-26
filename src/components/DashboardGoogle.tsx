@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react";
 import { protoMono } from '../styles/fonts';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
-import sdk, { type Context } from "@farcaster/frame-sdk";
+import DashboardBase, { ActivityData } from './DashboardBase';
 import GoalsModal from './GoalsModal';
 import ConnectDeviceModal from './ConnectDeviceModal';
-import Image from 'next/image';
 import Loader from './Loader';
-import DashboardGoogle from './DashboardGoogle';
-import DashboardGarmin from './DashboardGarmin';
+import sdk, { type Context } from "@farcaster/frame-sdk";
 
 interface UserGoals {
   calories_goal: number;
@@ -17,14 +15,7 @@ interface UserGoals {
   sleep_hours_goal: number;
 }
 
-interface ActivityData {
-  calories: number;
-  steps: number;
-  sleepHours: number;
-}
-
-export default function Dashboard() {
-  const [isLoading, setIsLoading] = useState(true);
+export default function DashboardGoogle() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [context, setContext] = useState<Context.FrameContext>();
   const [hasGoals, setHasGoals] = useState(false);
@@ -43,7 +34,6 @@ export default function Dashboard() {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<string | null>(null);
 
   const checkUserGoals = async () => {
     try {
@@ -281,14 +271,11 @@ export default function Dashboard() {
           const fid = context.user.fid.toString();
           console.log('Dashboard FID:', fid);
           setUserFid(fid);
-          await checkUserProvider(fid);
         } else {
           console.log('Esperando FID en Dashboard...');
         }
       } catch (error) {
         console.error('Error loading dashboard:', error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -317,31 +304,6 @@ export default function Dashboard() {
     }
   }, [userFid]);
 
-  const checkUserProvider = async (fid: string) => {
-    try {
-      const response = await fetch(`/api/auth/check-provider?user_fid=${fid}`);
-      const data = await response.json();
-      
-      if (data.success && data.provider) {
-        setProvider(data.provider);
-      } else {
-        setShowConnectModal(true);
-      }
-    } catch (error) {
-      console.error('Error checking user provider:', error);
-      setShowConnectModal(true);
-    }
-  };
-
-  const handleConnect = async (selectedProvider: string) => {
-    setProvider(selectedProvider);
-    setShowConnectModal(false);
-  };
-
-  if (isLoading) {
-    return <Loader message="Loading dashboard..." />;
-  }
-
   if (isTransitioning) {
     return <Loader message="Updating your data..." />;
   }
@@ -354,31 +316,131 @@ export default function Dashboard() {
     return (
       <ConnectDeviceModal
         onClose={() => setShowConnectModal(false)}
-        onConnect={handleConnect}
+        onConnect={handleConnectDevice}
         userFid={userFid}
       />
     );
   }
 
-  switch (provider) {
-    case 'google':
-      return <DashboardGoogle />;
-    case 'garmin':
-      return <DashboardGarmin />;
-    default:
   return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <div className="text-center">
-            <h1 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>No Provider Selected</h1>
-            <p className={`text-gray-400 mb-4 ${protoMono.className}`}>Please connect a device to continue.</p>
-              <button 
-              onClick={() => setShowConnectModal(true)}
-              className={`px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors ${protoMono.className}`}
-            >
-              Connect Device
-              </button>
+    <div className="w-full max-w-2xl mx-auto">
+      {/* Daily Activity */}
+      <div className="mb-8">
+        <h2 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>
+          {activity ? formatDate(new Date()) : 'Daily Activity'}
+        </h2>
+        
+        <div className="grid grid-cols-3 gap-8">
+          {/* Calories */}
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-4 border-gray-700 flex items-center justify-center bg-gray-900">
+                <CaloriesIcon className="w-12 h-12 text-white" />
+              </div>
+              <div 
+                className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                style={{ 
+                  clipPath: `inset(${100 - ((activity?.calories || 0) / (goals?.calories_goal || 1)) * 100}% 0 0 0)` 
+                }}
+              ></div>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-lg font-bold">
+                <span className="text-white">{activity?.calories || 0}</span>
+                <span className="text-gray-500">/{goals?.calories_goal || '---'}</span>
+              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Calories</p>
+            </div>
           </div>
+
+          {/* Steps */}
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-4 border-gray-700 flex items-center justify-center bg-gray-900">
+                <StepsIcon className="w-12 h-12 text-white" />
+              </div>
+              <div 
+                className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                style={{ 
+                  clipPath: `inset(${100 - ((activity?.steps || 0) / (goals?.steps_goal || 1)) * 100}% 0 0 0)` 
+                }}
+              ></div>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-lg font-bold">
+                <span className="text-white">{activity?.steps || 0}</span>
+                <span className="text-gray-500">/{goals?.steps_goal || '---'}</span>
+              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Steps</p>
+            </div>
+          </div>
+
+          {/* Sleep */}
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-4 border-gray-700 flex items-center justify-center bg-gray-900">
+                <SleepIcon className="w-12 h-12 text-white" />
+              </div>
+              <div 
+                className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                style={{ 
+                  clipPath: `inset(${100 - ((activity?.sleepHours || 0) / (goals?.sleep_hours_goal || 1)) * 100}% 0 0 0)` 
+                }}
+              ></div>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-lg font-bold">
+                <span className="text-white">{activity?.sleepHours || 0}</span>
+                <span className="text-gray-500">h/{goals?.sleep_hours_goal || '---'}h</span>
+              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Sleep</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly Activity */}
+      <div>
+        <h2 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>Weekly Activity</h2>
+        {weeklyStats.length > 0 ? (
+          <>
+            {renderProgressBars(
+              'Calories',
+              weeklyStats.map(day => ({ date: day.date, value: day.calories })),
+              goals?.calories_goal || 2500,
+              'cal'
+            )}
+            {renderProgressBars(
+              'Steps',
+              weeklyStats.map(day => ({ date: day.date, value: day.steps })),
+              goals?.steps_goal || 10000,
+              'steps'
+            )}
+            {renderProgressBars(
+              'Sleep',
+              weeklyStats.map(day => ({ date: day.date, value: day.sleep })),
+              goals?.sleep_hours_goal || 8,
+              'h'
+            )}
+          </>
+        ) : (
+          <div className="text-center text-gray-500">No weekly data available</div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {showGoalsModal && (
+        <GoalsModal
+          onSave={handleSaveGoals}
+        />
+      )}
+      {showConnectModal && (
+        <ConnectDeviceModal
+          onClose={() => setShowConnectModal(false)}
+          onConnect={handleConnectDevice}
+          userFid={userFid}
+        />
+      )}
     </div>
   );
-  }
 } 
