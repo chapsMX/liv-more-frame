@@ -5,7 +5,7 @@ import { OAuth2Client } from 'google-auth-library';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Asegurarnos de que tenemos todas las variables de entorno necesarias
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
   throw new Error('Faltan variables de entorno necesarias para Google OAuth');
 }
 
@@ -92,16 +92,16 @@ export async function GET(request: Request) {
         token_expiry
       ) VALUES (
         ${userFidNumber},
-           'google',
-           ${tokens.access_token}, 
-           ${tokens.refresh_token},
+        'google',
+        ${tokens.access_token}, 
+        ${tokens.refresh_token},
         ${new Date(tokens.expiry_date!)}
       )
-        ON CONFLICT (user_fid, provider) 
-        DO UPDATE SET 
-          google_token = EXCLUDED.google_token,
-          refresh_token = EXCLUDED.refresh_token,
-          token_expiry = EXCLUDED.token_expiry,
+      ON CONFLICT (user_fid, provider) 
+      DO UPDATE SET 
+        google_token = EXCLUDED.google_token,
+        refresh_token = EXCLUDED.refresh_token,
+        token_expiry = EXCLUDED.token_expiry,
         updated_at = CURRENT_TIMESTAMP
     `;
 
