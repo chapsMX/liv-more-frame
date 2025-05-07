@@ -5,16 +5,8 @@ import { protoMono } from '../styles/fonts';
 import Image from 'next/image';
 import sdk, { type Context } from "@farcaster/frame-sdk";
 import Loader from './Loader';
-import GoalsModal from './GoalsModal';
-import ConnectDeviceModal from './ConnectDeviceModal';
 import Footer from './Footer';
 import ControlPanel from './ControlPanel';
-
-interface UserGoals {
-  calories_goal: number;
-  steps_goal: number;
-  sleep_hours_goal: number;
-}
 
 export interface ActivityData {
   calories: number;
@@ -90,7 +82,7 @@ export default function DashboardBase({ children }: DashboardBaseProps) {
         <div className="flex-grow flex items-center justify-center">
           <div className="text-center">
             <h1 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>Access Denied</h1>
-            <p className={`text-gray-400 ${protoMono.className}`}>You don't have access to this application yet.</p>
+            <p className={`text-gray-400 ${protoMono.className}`}>You don&apos;t have access to this application yet.</p>
           </div>
         </div>
         <Footer />

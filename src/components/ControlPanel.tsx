@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { protoMono } from '../styles/fonts';
 
 interface ControlPanelProps {
@@ -20,15 +20,9 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
     garmin: false,
     oura: false
   });
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    checkDevicesStatus();
-  }, [userFid]);
-
-  const checkDevicesStatus = async () => {
+  const checkDevicesStatus = useCallback(async () => {
     try {
-      setIsLoading(true);
       const response = await fetch(`/api/auth/check-provider?user_fid=${userFid}`);
       const data = await response.json();
       
@@ -39,10 +33,12 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
       });
     } catch (error) {
       console.error('Error checking devices status:', error);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [userFid]);
+
+  useEffect(() => {
+    checkDevicesStatus();
+  }, [checkDevicesStatus]);
 
   const handleGoogleConnection = async () => {
     try {
@@ -116,7 +112,7 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
           </button>
         </div>
 
-        {/* Grid de secciones */}
+        {/* Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Sección de Dispositivos */}
           <section className="bg-gray-900 p-3 rounded-2xl border border-gray-800">

@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Liv More",
     openGraph: {
       title: "Liv More",
-      description: "Turn Healty Habitos Into Rewards",
+      description: "Turn Healty Habits Into Rewards",
     },
     other: {
       "fc:frame": JSON.stringify(frame),

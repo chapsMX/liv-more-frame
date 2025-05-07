@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { protoMono } from '../styles/fonts';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
-import DashboardBase, { ActivityData } from './DashboardBase';
 import GoalsModal from './GoalsModal';
 import ConnectDeviceModal from './ConnectDeviceModal';
 import Loader from './Loader';
@@ -15,12 +14,18 @@ interface UserGoals {
   sleep_hours_goal: number;
 }
 
+interface ActivityData {
+  calories: number;
+  steps: number;
+  sleepHours: number;
+}
+
 export default function DashboardGoogle() {
   const [isTransitioning, setIsTransitioning] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [context, setContext] = useState<Context.FrameContext>();
   const [hasGoals, setHasGoals] = useState(false);
   const [showGoalsModal, setShowGoalsModal] = useState(false);
-  const [showControlPanel, setShowControlPanel] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [goals, setGoals] = useState<UserGoals | null>(null);
@@ -32,10 +37,12 @@ export default function DashboardGoogle() {
     steps: number;
     sleep: number;
   }>>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [error, setError] = useState<string | null>(null);
 
-  const checkUserGoals = async () => {
+  const checkUserGoals = useCallback(async () => {
     try {
       if (!userFid) {
         console.log('FID no disponible en el estado del Dashboard');
@@ -58,9 +65,9 @@ export default function DashboardGoogle() {
     } finally {
       setIsTransitioning(false);
     }
-  };
+  }, [userFid]);
 
-  const checkUserConnection = async () => {
+  const checkUserConnection = useCallback(async () => {
     try {
       if (!userFid) return;
 
@@ -79,7 +86,7 @@ export default function DashboardGoogle() {
     } finally {
       setIsTransitioning(false);
     }
-  };
+  }, [userFid, hasGoals]);
 
   const handleSaveGoals = async (newGoals: { calories: number; steps: number; sleep: number }) => {
     try {
@@ -133,7 +140,7 @@ export default function DashboardGoogle() {
     });
   };
 
-  const fetchActivityData = async () => {
+  const fetchActivityData = useCallback(async () => {
     try {
       if (!userFid) {
         console.log('No hay userFid disponible para fetchActivityData');
@@ -174,7 +181,7 @@ export default function DashboardGoogle() {
         console.error('Stack trace:', error.stack);
       }
     }
-  };
+  }, [userFid]);
 
   const renderProgressBars = (
     title: string,
@@ -218,7 +225,7 @@ export default function DashboardGoogle() {
     );
   };
 
-  const fetchWeeklyData = async () => {
+  const fetchWeeklyData = useCallback(async () => {
     try {
       if (!userFid) {
         console.log('No hay userFid disponible para fetchWeeklyData');
@@ -258,7 +265,7 @@ export default function DashboardGoogle() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userFid]);
 
   useEffect(() => {
     const load = async () => {
@@ -289,7 +296,7 @@ export default function DashboardGoogle() {
       fetchActivityData();
       fetchWeeklyData();
     }
-  }, [userFid]);
+  }, [userFid, checkUserGoals, checkUserConnection, fetchActivityData, fetchWeeklyData]);
 
   useEffect(() => {
     if (userFid) {
@@ -302,7 +309,7 @@ export default function DashboardGoogle() {
         clearInterval(weeklyInterval);
       };
     }
-  }, [userFid]);
+  }, [userFid, fetchActivityData, fetchWeeklyData]);
 
   if (isTransitioning) {
     return <Loader message="Updating your data..." />;
@@ -325,8 +332,11 @@ export default function DashboardGoogle() {
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Daily Activity */}
-      <div className="mb-8">
-        <h2 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>
+      <div className="mb-2">
+        <h2 className={`text-2xl font-bold text-center mb-2 ${protoMono.className}`}>
+          Daily Activity
+        </h2>
+        <h2 className={`text-sm text-center font-bold mb-2 ${protoMono.className}`}>
           {activity ? formatDate(new Date()) : 'Daily Activity'}
         </h2>
         
@@ -401,7 +411,7 @@ export default function DashboardGoogle() {
 
       {/* Weekly Activity */}
       <div>
-        <h2 className={`text-2xl font-bold mb-4 ${protoMono.className}`}>Weekly Activity</h2>
+        <h2 className={`text-2xl text-center font-bold mb-4 ${protoMono.className}`}>Weekly Activity</h2>
         {weeklyStats.length > 0 ? (
           <>
             {renderProgressBars(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import sdk, {
 AddFrame,
@@ -29,45 +29,14 @@ export default function LivMore() {
   const [isLoading, setIsLoading] = useState(true);
   const [context, setContext] = useState<Context.FrameContext>();
   const [userState, setUserState] = useState<UserState | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showGoalsModal, setShowGoalsModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isTermsChecked, setIsTermsChecked] = useState(false);
 
-  // Cargar el contexto de Farcaster y verificar el estado del usuario
-  useEffect(() => {
-    const load = async () => {
-      try {
-        console.log("Iniciando carga del SDK");
-        const context = await sdk.context;
-        setContext(context);
-        
-        if (context.user?.fid) {
-          await checkUserState(context.user.fid.toString());
-          
-          // Intentar agregar el frame automáticamente
-          try {
-            await sdk.actions.addFrame();
-          } catch (error) {
-            if (error instanceof AddFrame.RejectedByUser) {
-              console.log('Usuario rechazó agregar el frame');
-            }
-          }
-        }
-
-        // Indicar que la app está lista para ser mostrada
-        await sdk.actions.ready();
-      } catch (error) {
-        console.error('Error loading context:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    load();
-  }, []);
-
   // Verificar el estado completo del usuario
-  const checkUserState = async (fid: string) => {
+  const checkUserState = useCallback(async (fid: string) => {
     try {
       console.log('Checking user state for FID:', fid);
       
@@ -147,7 +116,40 @@ export default function LivMore() {
     } catch (error) {
       console.error('Error checking user state:', error);
     }
-  };
+  }, [router, setShowGoalsModal, setShowConnectModal]);
+
+  // Cargar el contexto de Farcaster y verificar el estado del usuario
+  useEffect(() => {
+    const load = async () => {
+      try {
+        console.log("Iniciando carga del SDK");
+        const context = await sdk.context;
+        setContext(context);
+        
+        if (context.user?.fid) {
+          await checkUserState(context.user.fid.toString());
+          
+          // Intentar agregar el frame automáticamente
+          try {
+            await sdk.actions.addFrame();
+          } catch (error) {
+            if (error instanceof AddFrame.RejectedByUser) {
+              console.log('Usuario rechazó agregar el frame');
+            }
+          }
+        }
+
+        // Indicar que la app está lista para ser mostrada
+        await sdk.actions.ready();
+      } catch (error) {
+        console.error('Error loading context:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
+  }, [checkUserState]);
 
   // Función para generar un nonce válido
   const generateNonce = () => {
@@ -238,7 +240,8 @@ export default function LivMore() {
   };
 
   // Manejar la conexión del dispositivo
-  const handleConnectDevice = async (provider: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleConnectDevice = async (_provider: string) => {
     try {
       setShowConnectModal(false);
       await checkUserState(context!.user!.fid.toString());

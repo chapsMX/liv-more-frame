@@ -1,51 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { protoMono } from '../styles/fonts';
-import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
-import sdk, { type Context } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import GoalsModal from './GoalsModal';
 import ConnectDeviceModal from './ConnectDeviceModal';
-import Image from 'next/image';
 import Loader from './Loader';
 import DashboardGoogle from './DashboardGoogle';
-import DashboardGarmin from './DashboardGarmin';
-
-interface UserGoals {
-  calories_goal: number;
-  steps_goal: number;
-  sleep_hours_goal: number;
-}
-
-interface ActivityData {
-  calories: number;
-  steps: number;
-  sleepHours: number;
-}
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [context, setContext] = useState<Context.FrameContext>();
   const [hasGoals, setHasGoals] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showGoalsModal, setShowGoalsModal] = useState(false);
-  const [showControlPanel, setShowControlPanel] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [goals, setGoals] = useState<UserGoals | null>(null);
-  const [activity, setActivity] = useState<ActivityData | null>(null);
   const [userFid, setUserFid] = useState('');
-  const [weeklyStats, setWeeklyStats] = useState<Array<{
-    date: string;
-    calories: number;
-    steps: number;
-    sleep: number;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
 
-  const checkUserGoals = async () => {
+  const checkUserGoals = useCallback(async () => {
     try {
       if (!userFid) {
         console.log('FID no disponible en el estado del Dashboard');
@@ -57,7 +32,6 @@ export default function Dashboard() {
       const data = await response.json();
       
       if (data.hasGoals) {
-        setGoals(data.goals);
         setHasGoals(true);
         setShowGoalsModal(false);
       } else {
@@ -68,9 +42,9 @@ export default function Dashboard() {
     } finally {
       setIsTransitioning(false);
     }
-  };
+  }, [userFid]);
 
-  const checkUserConnection = async () => {
+  const checkUserConnection = useCallback(async () => {
     try {
       if (!userFid) return;
 
@@ -89,7 +63,7 @@ export default function Dashboard() {
     } finally {
       setIsTransitioning(false);
     }
-  };
+  }, [userFid, hasGoals]);
 
   const handleSaveGoals = async (newGoals: { calories: number; steps: number; sleep: number }) => {
     try {
@@ -110,11 +84,6 @@ export default function Dashboard() {
 
       const data = await response.json();
       if (data.success) {
-        setGoals({
-          calories_goal: newGoals.calories,
-          steps_goal: newGoals.steps,
-          sleep_hours_goal: newGoals.sleep
-        });
         setHasGoals(true);
         setShowGoalsModal(false);
       }
@@ -123,159 +92,11 @@ export default function Dashboard() {
     }
   };
 
-  const handleConnectDevice = async (provider: string) => {
-    try {
-      if (provider === 'google') {
-        setIsConnected(true);
-        setShowConnectModal(false);
-      }
-    } catch (error) {
-      console.error('Error connecting device:', error);
-    }
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const fetchActivityData = async () => {
-    try {
-      if (!userFid) {
-        console.log('No hay userFid disponible para fetchActivityData');
-        return;
-      }
-
-      console.log('Iniciando fetchActivityData para userFid:', userFid);
-      
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const response = await fetch(`/api/fitness/activity?user_fid=${userFid}&timezone=${encodeURIComponent(userTimezone)}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`Error al obtener datos de actividad: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Datos recibidos de actividad:', data);
-
-      if (!data.success) {
-        throw new Error(data.error || 'Error en la respuesta del servidor');
-      }
-
-      if (!data.activity) {
-        throw new Error('No se encontraron datos de actividad');
-      }
-
-      setActivity(data.activity);
-      console.log('Datos de actividad actualizados:', data.activity);
-    } catch (error) {
-      console.error('Error detallado en fetchActivityData:', error);
-      if (error instanceof Error) {
-        console.error('Stack trace:', error.stack);
-      }
-    }
-  };
-
-  const renderProgressBars = (
-    title: string,
-    data: { date: string; value: number }[],
-    goal: number,
-    unit: string
-  ) => {
-    return (
-      <div className="mb-2">
-        <h3 className={`text-lg font-bold mb-2 ${protoMono.className}`}>{title}</h3>
-        <div className="grid grid-cols-7 gap-2">
-          {/* Days of week */}
-          {data.map((day, index) => (
-            <div key={`day-${index}`} className={`text-center ${protoMono.className}`}>
-              <div className="text-gray-500 text-xs mb-1">
-                {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
-              </div>
-            </div>
-          ))}
-
-          {/* Progress bars */}
-          {data.map((day, index) => {
-            const percentage = (day.value / goal) * 100;
-            const isComplete = percentage >= 100;
-            return (
-              <div key={`bar-${index}`} className="flex flex-col items-center">
-                <div className="h-24 w-full relative flex items-end">
-                  <div 
-                    className={`w-full rounded-t-sm transition-all ${isComplete ? 'bg-green-500' : 'bg-violet-500'}`}
-                    style={{ height: `${Math.min(percentage, 100)}%` }}
-                  />
-                </div>
-                <div className={`text-xs mt-1 ${protoMono.className} text-gray-400`}>
-                  {day.value.toLocaleString()}{title === "Calories" ? "" : unit}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const fetchWeeklyData = async () => {
-    try {
-      if (!userFid) {
-        console.log('No hay userFid disponible para fetchWeeklyData');
-        return;
-      }
-
-      console.log('Iniciando fetchWeeklyData para userFid:', userFid);
-      
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const response = await fetch(`/api/fitness/weekly?user_fid=${userFid}&timezone=${encodeURIComponent(userTimezone)}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response weekly:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`Error al obtener datos semanales: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Datos recibidos semanales:', data);
-
-      if (!data.success) {
-        throw new Error(data.error || 'Error en la respuesta del servidor');
-      }
-
-      setWeeklyStats(data.data);
-      console.log('Datos semanales actualizados:', data.data);
-    } catch (error) {
-      console.error('Error detallado en fetchWeeklyData:', error);
-      if (error instanceof Error) {
-        console.error('Stack trace:', error.stack);
-      }
-      setError(error instanceof Error ? error.message : 'Error al cargar datos semanales');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     const load = async () => {
       try {
         const context = await sdk.context;
         console.log('Dashboard context:', context);
-        setContext(context);
         
         if (context.user?.fid) {
           const fid = context.user.fid.toString();
@@ -299,23 +120,8 @@ export default function Dashboard() {
     if (userFid) {
       checkUserGoals();
       checkUserConnection();
-      fetchActivityData();
-      fetchWeeklyData();
     }
-  }, [userFid]);
-
-  useEffect(() => {
-    if (userFid) {
-      fetchActivityData();
-      fetchWeeklyData();
-      const activityInterval = setInterval(fetchActivityData, 60000);
-      const weeklyInterval = setInterval(fetchWeeklyData, 300000); // 5 minutos
-      return () => {
-        clearInterval(activityInterval);
-        clearInterval(weeklyInterval);
-      };
-    }
-  }, [userFid]);
+  }, [userFid, checkUserGoals, checkUserConnection]);
 
   const checkUserProvider = async (fid: string) => {
     try {
@@ -363,8 +169,6 @@ export default function Dashboard() {
   switch (provider) {
     case 'google':
       return <DashboardGoogle />;
-    case 'garmin':
-      return <DashboardGarmin />;
     default:
   return (
         <div className="min-h-screen bg-black text-white flex items-center justify-center">
