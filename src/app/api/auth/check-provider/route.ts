@@ -15,7 +15,21 @@ export async function GET(request: Request) {
       );
     }
 
-    // Primero verificamos si tiene conexión con Garmin
+    // Primero verificamos si tiene conexión con Rook (nueva implementación)
+    const rookResult = await sql`
+      SELECT provider
+      FROM user_connections
+      WHERE user_fid = ${user_fid}
+        AND rook_user_id IS NOT NULL
+    `;
+
+    if (rookResult.length > 0) {
+      return NextResponse.json({
+        provider: rookResult[0].provider || 'rook'
+      });
+    }
+
+    // Luego verificamos si tiene conexión con Garmin (implementación anterior)
     const garminResult = await sql`
       SELECT 1 as connected
       FROM user_connections_garmin
@@ -29,7 +43,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // Si no tiene Garmin, verificamos Google
+    // Si no tiene Garmin, verificamos Google (implementación anterior)
     const googleResult = await sql`
       SELECT 1 as connected
       FROM user_connections

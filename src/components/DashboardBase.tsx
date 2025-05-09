@@ -7,6 +7,8 @@ import sdk, { type Context } from "@farcaster/frame-sdk";
 import Loader from './Loader';
 import Footer from './Footer';
 import ControlPanel from './ControlPanel';
+import DailyActivity, { RookActivityData } from './DailyActivity';
+import WeeklyStats from './WeeklyStats';
 
 export interface ActivityData {
   calories: number;
@@ -25,6 +27,7 @@ export default function DashboardBase({ children }: DashboardBaseProps) {
   const [canUse, setCanUse] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [showControlPanel, setShowControlPanel] = useState(false);
+  const [rookData, setRookData] = useState<RookActivityData | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -70,6 +73,21 @@ export default function DashboardBase({ children }: DashboardBaseProps) {
       setCanUse(false);
       setHasAcceptedTerms(false);
     }
+  };
+  
+  // Callback para recibir datos de DailyActivity
+  const handleRookDataLoaded = (data: RookActivityData | null) => {
+    // Usar una función de actualización de estado para evitar actualizaciones innecesarias
+    setRookData(prevData => {
+      // Si los datos son iguales, no hacemos nada
+      if (JSON.stringify(prevData) === JSON.stringify(data)) {
+        console.log('Datos de Rook sin cambios, evitando renderizado');
+        return prevData;
+      }
+      
+      console.log('Actualizando datos de Rook en DashboardBase');
+      return data;
+    });
   };
 
   if (isLoading) {
@@ -126,6 +144,21 @@ export default function DashboardBase({ children }: DashboardBaseProps) {
                 </button>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Health Data and Daily Activity */}
+        <div className="w-full max-w-2xl mx-auto mt-4">
+          {userFid && (
+            <>
+              <DailyActivity 
+                userFid={userFid} 
+                onDataLoaded={handleRookDataLoaded} 
+              />
+              <WeeklyStats 
+                userFid={userFid} 
+              />
+            </>
           )}
         </div>
 

@@ -50,25 +50,18 @@ export default function LivMore() {
       
       // 2. Si puede usar la app, verificar goals
       let hasGoals = false;
-      let provider = null;
       
       if (whitelistData.is_whitelisted && 
           whitelistData.can_use && 
           whitelistData.accepted_tos && 
           whitelistData.accepted_privacy_policy) {
-        console.log('User can use app, checking goals and provider...');
+        console.log('User can use app, checking goals...');
         
         // Verificar goals
         const goalsResponse = await fetch(`/api/goals/check?user_fid=${fid}`);
         const goalsData = await goalsResponse.json();
         hasGoals = goalsData.hasGoals;
         console.log('Goals data:', goalsData);
-
-        // Verificar proveedor conectado
-        const providerResponse = await fetch(`/api/auth/check-provider?user_fid=${fid}`);
-        const providerData = await providerResponse.json();
-        provider = providerData.provider;
-        console.log('Provider data:', providerData);
       }
 
       const newUserState = {
@@ -76,8 +69,7 @@ export default function LivMore() {
         can_use: whitelistData.can_use || false,
         accepted_tos: whitelistData.accepted_tos || false,
         accepted_privacy_policy: whitelistData.accepted_privacy_policy || false,
-        hasGoals,
-        provider
+        hasGoals
       };
       
       console.log('Setting new user state:', newUserState);
@@ -96,14 +88,9 @@ export default function LivMore() {
           return;
         }
         
-        if (!provider) {
-          console.log('User needs to connect a device');
-          setShowConnectModal(true);
-        return;
-      }
-
-        console.log('All requirements met, redirecting to dashboard...', { provider });
-        router.push(`/dashboard/${provider}`);
+        // Redirigir siempre a /dashboard sin verificar el proveedor
+        console.log('All requirements met, redirecting to dashboard...');
+        router.push(`/dashboard`);
       } else {
         console.log('User does not meet basic requirements:', {
           is_whitelisted: newUserState.is_whitelisted,
@@ -116,7 +103,7 @@ export default function LivMore() {
     } catch (error) {
       console.error('Error checking user state:', error);
     }
-  }, [router, setShowGoalsModal, setShowConnectModal]);
+  }, [router, setShowGoalsModal]);
 
   // Cargar el contexto de Farcaster y verificar el estado del usuario
   useEffect(() => {
@@ -343,17 +330,6 @@ export default function LivMore() {
     // Necesita configurar goals
     if (!userState.hasGoals) {
       return <GoalsModal onSave={handleSaveGoals} />;
-  }
-
-    // Necesita conectar dispositivo
-    if (!userState.provider) {
-      return (
-        <ConnectDeviceModal
-          onClose={() => {}} // No permitimos cerrar si no hay proveedor
-          onConnect={handleConnectDevice}
-          userFid={context.user.fid.toString()}
-        />
-      );
     }
   }
 
