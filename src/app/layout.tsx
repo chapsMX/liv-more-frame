@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { protoMono } from '../styles/fonts';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
+
 export const metadata: Metadata = {
   title: "Liv More",
   description: "Turn Healty Habitos Into Rewards",

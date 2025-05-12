@@ -13,7 +13,11 @@ export async function POST(request: Request) {
     
     if (!user_fid || !data_source) {
       return NextResponse.json(
-        { success: false, error: 'user_fid y data_source son requeridos' },
+        { 
+          success: false, 
+          error: 'user_fid y data_source son requeridos',
+          details: { user_fid: !user_fid, data_source: !data_source }
+        },
         { status: 400 }
       );
     }
@@ -24,60 +28,57 @@ export async function POST(request: Request) {
     let rookUserId: string;
     let currentDataSources: any = null;
     
-    // Verificar si tenemos el rookUserId en caché
-    if (rookUserIdCache.has(user_fid.toString())) {
-      rookUserId = rookUserIdCache.get(user_fid.toString())!;
+    // Obtener el rook_user_id del caché o la base de datos
+    if (rookUserIdCache.has(user_fid)) {
+      rookUserId = rookUserIdCache.get(user_fid)!;
       console.log(`[API Rook Revoke] Usando rook_user_id desde caché: ${rookUserId}`);
     } else {
       try {
-        // Buscamos el rook_user_id en la tabla rook_connection
+        // Intentar obtener de rook_connection primero
         const connectionResult = await sql`
-          SELECT id, rook_user_id, data_sources
-          FROM rook_connection
-          WHERE user_fid = ${user_fid}
+          SELECT rook_user_id, data_sources FROM rook_connection
+          WHERE user_fid = ${user_fid} AND rook_user_id IS NOT NULL
           LIMIT 1
         `;
-
-        if (connectionResult.length === 0 || !connectionResult[0].rook_user_id) {
-          console.log(`[API Rook Revoke] No se encontró conexión con Rook para user_fid: ${user_fid}`);
-          
-          // Intento fallback a user_connections por compatibilidad
+        
+        if (connectionResult.length === 0) {
+          // Fallback a user_connections para compatibilidad
           const legacyResult = await sql`
-            SELECT id, rook_user_id
-            FROM user_connections
-            WHERE user_fid = ${user_fid}
+            SELECT rook_user_id FROM user_connections
+            WHERE user_fid = ${user_fid} AND rook_user_id IS NOT NULL
             LIMIT 1
           `;
           
-          if (legacyResult.length === 0 || !legacyResult[0].rook_user_id) {
-            return NextResponse.json({ 
-              success: false, 
-              error: 'Usuario no conectado a Rook' 
-            }, { status: 404 });
+          if (legacyResult.length === 0) {
+            return NextResponse.json(
+              { 
+                success: false, 
+                error: 'Usuario no encontrado o no conectado a Rook',
+                details: { user_fid }
+              },
+              { status: 404 }
+            );
           }
           
           rookUserId = legacyResult[0].rook_user_id;
-          console.log(`[API Rook Revoke] Usando rook_user_id de tabla legacy: ${rookUserId}`);
         } else {
           rookUserId = connectionResult[0].rook_user_id;
-          
-          // Guardar la información actual de data_sources para actualizarla después
-          if (connectionResult[0].data_sources) {
-            currentDataSources = connectionResult[0].data_sources;
-            console.log('[API Rook Revoke] Datos actuales de fuentes recuperados de BD');
-          }
+          currentDataSources = connectionResult[0].data_sources;
         }
         
-        // Guardar en caché para futuros usos
-        rookUserIdCache.set(user_fid.toString(), rookUserId);
+        // Guardar en caché
+        rookUserIdCache.set(user_fid, rookUserId);
         console.log(`[API Rook Revoke] Guardando rook_user_id en caché: ${rookUserId}`);
-        
       } catch (dbError) {
         console.error(`[API Rook Revoke] Error al consultar la base de datos:`, dbError);
-        
-        // Usar user_fid como rookUserId si no se encontró en la base de datos
-        rookUserId = user_fid;
-        console.log(`[API Rook Revoke] Usando user_fid como rook_user_id alternativo: ${rookUserId}`);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Error al acceder a la base de datos',
+            details: { message: dbError instanceof Error ? dbError.message : 'Unknown error' }
+          },
+          { status: 503 }
+        );
       }
     }
     
@@ -88,7 +89,11 @@ export async function POST(request: Request) {
     if (!rookClientUuid || !rookClientSecret) {
       console.error('[API Rook Revoke] Falta configuración de Rook: client_uuid o client_secret no encontrados');
       return NextResponse.json(
-        { success: false, error: 'Error en la configuración del servidor' },
+        { 
+          success: false, 
+          error: 'Error en la configuración del servidor',
+          details: { missing_credentials: { client_uuid: !rookClientUuid, client_secret: !rookClientSecret } }
+        },
         { status: 500 }
       );
     }
@@ -108,63 +113,60 @@ export async function POST(request: Request) {
             body: JSON.stringify({
               data_source: data_source
             }),
-            // Añadir timeout para evitar bloqueos largos
             signal: AbortSignal.timeout(5000) // 5 segundos de timeout
           }
         );
 
         if (!rookResponse.ok) {
           let errorMessage = 'Error revocando la conexión con Rook';
+          let errorDetails: any = { status: rookResponse.status };
+          
           try {
             const errorData = await rookResponse.json();
             errorMessage = errorData.message || errorData.error || errorMessage;
+            errorDetails.response = errorData;
           } catch {
-            // Intentar obtener mensaje de error como texto
             try {
               const errorText = await rookResponse.text();
-              if (errorText) errorMessage = errorText;
+              if (errorText) {
+                errorMessage = errorText;
+                errorDetails.response = errorText;
+              }
             } catch {}
           }
           
           throw new Error(errorMessage);
         }
 
-        return { success: true };
+        const responseData = await rookResponse.json();
+        return { success: true, data: responseData };
       } catch (error) {
         console.error(`[API Rook Revoke] Intento ${retryCount + 1}/${maxRetries + 1} falló:`, error);
         
-        // Si hemos alcanzado el máximo de reintentos, lanzar el error
         if (retryCount >= maxRetries) {
           throw error;
         }
         
-        // Esperar antes de reintentar (backoff exponencial)
         await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-        
-        // Reintentar
         return attemptRevocation(retryCount + 1, maxRetries);
       }
     };
     
     try {
       // Intentar revocar con reintentos
-      await attemptRevocation();
+      const revocationResult = await attemptRevocation();
       
       console.log(`[API Rook Revoke] Conexión revocada correctamente para user_fid: ${user_fid}, fuente: ${data_source}`);
       
       // Actualizar los datos en la base de datos para reflejar la revocación
       try {
-        // Si tenemos data_sources actual, actualizamos solo la fuente específica
         if (currentDataSources && currentDataSources.sources) {
-          // Crear una copia de los datos actuales
           const updatedSources = { ...currentDataSources };
           
-          // Modificar la fuente específica como no autorizada
           if (updatedSources.sources && typeof updatedSources.sources === 'object') {
             updatedSources.sources[data_source] = false;
           }
           
-          // Actualizar en la base de datos
           await sql`
             UPDATE rook_connection
             SET 
@@ -175,7 +177,6 @@ export async function POST(request: Request) {
           `;
           console.log(`[API Rook Revoke] Datos de fuentes actualizados en BD para user_fid: ${user_fid}`);
         } else {
-          // Si no tenemos datos actuales, marcamos el estado para esta fuente
           const defaultSources = {
             user_id: rookUserId,
             sources: {
@@ -199,26 +200,37 @@ export async function POST(request: Request) {
         }
       } catch (dbError) {
         console.error(`[API Rook Revoke] Error actualizando estado en BD:`, dbError);
-        // Continuamos a pesar del error para devolver éxito al cliente
+        // Log pero no fallar, ya que la revocación fue exitosa
       }
       
-      // Actualizar el estado en el front-end
       return NextResponse.json({
         success: true,
-        message: `Conexión con ${data_source} revocada correctamente`
+        message: `Conexión con ${data_source} revocada correctamente`,
+        data: revocationResult.data
       });
     } catch (revokeError: any) {
       console.error(`[API Rook Revoke] Error final al revocar:`, revokeError);
       return NextResponse.json(
-        { success: false, error: revokeError.message || 'Error al revocar la conexión' },
+        { 
+          success: false, 
+          error: revokeError.message || 'Error al revocar la conexión',
+          details: {
+            message: revokeError instanceof Error ? revokeError.message : 'Unknown error',
+            data_source,
+            user_fid
+          }
+        },
         { status: 500 }
       );
     }
-    
   } catch (error) {
     console.error('[API Rook Revoke] Error general:', error);
     return NextResponse.json(
-      { success: false, error: 'Error interno del servidor. Por favor, inténtelo más tarde.' },
+      { 
+        success: false, 
+        error: 'Error interno del servidor. Por favor, inténtelo más tarde.',
+        details: { message: error instanceof Error ? error.message : 'Unknown error' }
+      },
       { status: 500 }
     );
   }

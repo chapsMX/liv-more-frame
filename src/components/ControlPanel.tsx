@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { protoMono } from '../styles/fonts';
+import { Button } from './Button';
+import { rookService } from '../services/rook';
 
 interface ControlPanelProps {
   onClose: () => void;
@@ -66,6 +68,9 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
     steps: 10000,
     sleep: 8
   });
+
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Obtener todas las fuentes de datos conectadas
   const fetchConnectedSources = useCallback(async () => {
@@ -146,47 +151,79 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
 
   // Función para revocar una conexión específica
   const handleRevokeConnection = async (dataSource: string) => {
-    if (!userFid || !dataSource) return;
+    if (!userFid || !dataSource) {
+      console.log('[Rook Revoke] Missing userFid or dataSource:', { userFid, dataSource });
+      return;
+    }
     
+    console.log(`[Rook Revoke] Iniciando revocación para user_fid: ${userFid}, fuente: ${dataSource}`);
     setRevoking(dataSource);
+    setConnectionError(null);
     
     try {
-      const response = await fetch('/api/rook/revoke-connection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_fid: userFid,
-          data_source: dataSource
-        }),
-      });
-      
-      const result = await response.json();
+      // Llamar directamente a la API de Rook para revocar la conexión
+      console.log('[Rook Revoke] Llamando a rookService.revokeConnection');
+      const result = await rookService.revokeConnection(userFid, dataSource);
       
       if (result.success) {
-        console.log(`Conexión con ${dataSource} revocada correctamente`);
+        console.log(`[Rook Revoke] Conexión con ${dataSource} revocada correctamente`);
         
         // Actualizar el estado local
-        setRookConnections(prev => 
-          prev.filter(conn => conn.data_source !== dataSource)
-        );
+        setRookConnections(prev => {
+          const updated = prev.filter(conn => conn.data_source !== dataSource);
+          console.log('[Rook Revoke] Estado local actualizado:', updated);
+          return updated;
+        });
         
         // Si era la última conexión, actualizar el estado de conexiones activas
         if (rookConnections.length <= 1) {
+          console.log('[Rook Revoke] Última conexión revocada, actualizando estado');
           setHasActiveConnections(false);
         }
         
-        // Actualizar después de un breve retraso para dar tiempo a que la API procese la revocación
-        setTimeout(() => {
-          console.log('Actualizando conexiones después de revocar...');
-          fetchConnectedSources();
-        }, 2000);
+        // Obtener el estado actualizado de las conexiones después de un breve retraso
+        setTimeout(async () => {
+          try {
+            console.log('[Rook Revoke] Obteniendo estado actualizado de conexiones');
+            const updatedSources = await rookService.getConnectedSources(userFid);
+            
+            if (updatedSources) {
+              console.log('[Rook Revoke] Fuentes actualizadas recibidas:', updatedSources);
+              // Actualizar el estado con las fuentes conectadas actuales
+              const activeConnections = Object.entries(updatedSources)
+                .filter(([_, value]) => Boolean(value))
+                .map(([key]) => ({
+                  data_source: key,
+                  authorized: true
+                }));
+              
+              console.log('[Rook Revoke] Conexiones activas actualizadas:', activeConnections);
+              setRookConnections(activeConnections);
+              setHasActiveConnections(activeConnections.length > 0);
+            }
+          } catch (updateError) {
+            console.error('[Rook Revoke] Error actualizando las conexiones:', updateError);
+            // No mostrar este error al usuario ya que la revocación fue exitosa
+          }
+        }, 1000);
       } else {
-        console.error(`Error revocando conexión:`, result.error);
+        throw new Error(result.error || 'Error desconocido al revocar la conexión');
       }
     } catch (err) {
-      console.error('Error en la petición de revocación:', err);
+      let errorMessage = 'Error desconocido al revocar la conexión';
+      
+      if (err instanceof Error) {
+        console.error('[Rook Revoke] Error completo:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        });
+        errorMessage = err.message;
+      } else {
+        console.error('[Rook Revoke] Error no estándar:', err);
+      }
+      
+      setConnectionError(`Error al revocar la conexión: ${errorMessage}`);
     } finally {
       setRevoking(null);
     }
@@ -251,6 +288,25 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
       }));
     }
   };
+
+  const handleConnectRook = useCallback(() => {
+    window.open('https://connect.tryrook.io/', '_blank');
+  }, []);
+
+  const handleConnectAppleHealth = useCallback(async () => {
+    try {
+      setIsConnecting(true);
+      setError(null);
+      // For now, we'll use a hardcoded user ID. In a real app, this would come from your auth system
+      const userId = 'test-user-1';
+      await rookService.connectAppleHealth(userId);
+    } catch (err) {
+      console.error('Error connecting to Apple Health:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect to Apple Health');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -363,6 +419,24 @@ export default function ControlPanel({ onClose, userFid }: ControlPanelProps) {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Apple Health Connect */}
+              <div className="rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between p-3 bg-gray-800">
+                  <span className={protoMono.className}>Apple Health</span>
+                  <button 
+                    onClick={handleConnectAppleHealth}
+                    className={`p-2 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors text-center border-2 border-green-500 ${protoMono.className}`}
+                  >
+                    <span className="text-white text-sm">Connect</span>
+                  </button>
+                </div>
+                <div className="p-2 bg-gray-750">
+                  <p className="text-xs text-gray-400">
+                    Connect with Apple Health to sync your health and fitness data
+                  </p>
+                </div>
               </div>
             </div>
           </section>
