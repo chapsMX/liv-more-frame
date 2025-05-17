@@ -44,3 +44,4 @@ next-env.d.ts
 #otro
 db-structure.json
 init.sql
+.cursor/scratchpad.md
