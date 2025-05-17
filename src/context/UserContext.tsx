@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-interface UserState {
+export interface UserState {
   isWhitelisted: boolean;
   acceptedTos: boolean;
   acceptedPrivacyPolicy: boolean;
@@ -11,6 +11,7 @@ interface UserState {
   displayName?: string;
   userFid?: number;
   ethAddress?: string;
+  connectedProvider?: string;
 }
 
 interface UserContextType {
@@ -26,6 +27,7 @@ const initialState: UserState = {
   acceptedTos: false,
   acceptedPrivacyPolicy: false,
   canUse: false,
+  connectedProvider: undefined,
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);

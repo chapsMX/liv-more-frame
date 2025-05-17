@@ -1,6 +1,6 @@
 export const MIN_GOALS = {
-  CALORIES: 2000,
-  STEPS: 7000,
+  CALORIES: 1750,
+  STEPS: 5500,
   SLEEP: 7
 } as const;
 

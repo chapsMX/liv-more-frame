@@ -12,7 +12,7 @@ export async function GET() {
       name: "Liv More",
       iconUrl: `${appUrl}/icon.png`,
       homeUrl: appUrl,
-      imageUrl: `${appUrl}/frameImage.jpg`,
+      imageUrl: `${appUrl}/frameImage.png`,
       buttonTitle: "Join Liv More Whitelist",
       splashImageUrl: `${appUrl}/splash.png`,
       splashBackgroundColor: "#101827",
