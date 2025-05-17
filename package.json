@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@auth/core": "^0.39.1",
+    "@auth/core": "0.34.2",
     "@farcaster/auth-client": "^0.5.0",
     "@farcaster/auth-kit": "^0.7.0",
     "@farcaster/frame-sdk": "^0.0.31",
