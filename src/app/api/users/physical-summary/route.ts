@@ -4,6 +4,24 @@ const ROOK_API_URL = 'https://api.rook-connect.review';
 const ROOK_CLIENT_UUID = process.env.ROOK_CLIENT_UUID!;
 const ROOK_CLIENT_SECRET = process.env.ROOK_CLIENT_SECRET!;
 
+interface ActivityDuration {
+  duration_seconds_int: number;
+}
+
+interface ActivityEvent {
+  duration?: ActivityDuration;
+}
+
+interface PhysicalHealthEvents {
+  activity: ActivityEvent[];
+}
+
+interface ActivityResponse {
+  physical_health?: {
+    events?: PhysicalHealthEvents;
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -105,12 +123,12 @@ export async function GET(request: Request) {
     // Procesar datos de actividad si están disponibles
     let activeSeconds = 0;
     if (activityResponse.ok && activityResponse.status !== 204) {
-      const activityData = await activityResponse.json();
+      const activityData = await activityResponse.json() as ActivityResponse;
       console.log('✅ Datos de actividad obtenidos:', activityData);
 
       // Sumar la duración de todas las actividades
       if (activityData.physical_health?.events?.activity) {
-        activeSeconds = activityData.physical_health.events.activity.reduce((total: number, activity: any) => {
+        activeSeconds = activityData.physical_health.events.activity.reduce((total: number, activity: ActivityEvent) => {
           return total + (activity.duration?.duration_seconds_int || 0);
         }, 0);
       }

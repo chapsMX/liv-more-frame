@@ -174,7 +174,7 @@ export default function LivMore() {
         sdk.removeAllListeners();
       };
     }
-  }, [isSDKLoaded]);
+  }, [isSDKLoaded, checkWhitelistStatus]);
 
   useEffect(() => {
     // Redirigir al dashboard si el usuario cumple con todos los requisitos

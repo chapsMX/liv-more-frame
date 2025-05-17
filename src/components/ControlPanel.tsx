@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { protoMono } from '../styles/fonts';
 import { useUser } from '../context/UserContext';
 import DGModal from './DGModal';
 import { validateGoals } from '@/constants/goals';
-import { useRouter } from 'next/navigation';
 
 interface ControlPanelProps {
   onClose: () => void;
@@ -40,14 +39,8 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
   const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(true);
   const [isRevoking, setIsRevoking] = useState(false);
-  const router = useRouter();
 
-  useEffect(() => {
-    fetchUserGoals();
-    fetchConnectedDevices();
-  }, []);
-
-  const fetchUserGoals = async () => {
+  const fetchUserGoals = useCallback(async () => {
     try {
       const response = await fetch(`/api/users/check-goals?fid=${userState.userFid}`);
       const data = await response.json();
@@ -63,9 +56,9 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
     } catch (error) {
       console.error('Error fetching user goals:', error);
     }
-  };
+  }, [userState.userFid]);
 
-  const fetchConnectedDevices = async () => {
+  const fetchConnectedDevices = useCallback(async () => {
     try {
       setIsLoadingDevices(true);
       const response = await fetch(`/api/users/check-rook-connections?fid=${userState.userFid}`);
@@ -86,7 +79,7 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
         // Si no, usar rook_authorized_sources
         else if (data.rook_authorized_sources) {
           const authorizedDevices = Object.entries(data.rook_authorized_sources)
-            .filter(([_, value]) => value === true)
+            .filter(([, isConnected]) => isConnected)
             .map(([key]) => ({
               data_source: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
               authorized: true
@@ -107,7 +100,12 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
     } finally {
       setIsLoadingDevices(false);
     }
-  };
+  }, [userState.userFid]);
+
+  useEffect(() => {
+    fetchUserGoals();
+    fetchConnectedDevices();
+  }, [fetchUserGoals, fetchConnectedDevices]);
 
   const handleSaveGoals = async (newGoals: UserGoals) => {
     const validation = validateGoals(newGoals);
@@ -231,15 +229,6 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
             <div className="py-2 border-b border-gray-700">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400">Connected Devices</span>
-{/*                 <button
-                  onClick={() => router.push('/connect-device')}
-                  className="text-violet-400 hover:text-violet-300 transition-colors text-sm flex items-center gap-1"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Device
-                </button> */}
               </div>
               {isLoadingDevices ? (
                 <div className="text-gray-500 text-sm">Loading devices...</div>

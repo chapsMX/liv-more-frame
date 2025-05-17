@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import RookDeviceConnection from '@/components/RookDeviceConnection';
 import { useUser } from '@/context/UserContext';
 
-export default function ConnectDevicePage() {
+function ConnectDeviceContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -29,4 +29,12 @@ export default function ConnectDevicePage() {
   }, [pathname, searchParams, router, userState]);
 
   return <RookDeviceConnection />;
+}
+
+export default function ConnectDevicePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ConnectDeviceContent />
+    </Suspense>
+  );
 } 

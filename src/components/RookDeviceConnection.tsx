@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { protoMono } from '../styles/fonts';
 import { ROOK_CONFIG } from '@/constants/rook';
-import type { UserState } from '@/context/UserContext';
 
 export default function RookDeviceConnection() {
   const { userState, setUserState } = useUser();
@@ -33,12 +32,23 @@ export default function RookDeviceConnection() {
       const clientUuid = searchParams.get('client_uuid');
       const userId = searchParams.get('user_id');
 
+      console.log('📝 Parámetros de URL:', {
+        provider,
+        rookUserId,
+        status,
+        fromRedirect,
+        clientUuid,
+        userId,
+        currentUserFid: userState.userFid
+      });
+
       // Si venimos de una redirección de Rook, usar esos parámetros
       if (fromRedirect === 'true' && clientUuid && userId) {
         console.log('🔍 Procesando redirección de Rook:', { clientUuid, userId });
         
         try {
           // Verificar la conexión en nuestra API
+          console.log('🔍 Verificando conexión en API:', `/api/users/check-rook-connections?fid=${userId}`);
           const response = await fetch(`/api/users/check-rook-connections?fid=${userId}`);
           const data = await response.json();
           

@@ -3,6 +3,52 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+interface RookMetadata {
+  datetime_string: string;
+  sources_of_data_array: string[];
+  user_id_string: string;
+}
+
+interface PhysicalSummary {
+  distance?: {
+    steps_int: number;
+    distance_meters_float: number;
+  };
+  calories?: {
+    calories_expenditure_kcal_float: number;
+  };
+  metadata?: RookMetadata;
+}
+
+interface SleepSummary {
+  duration?: {
+    sleep_duration_seconds_int: number;
+  };
+  metadata?: RookMetadata;
+}
+
+interface RookWebhookData {
+  user_id: string;
+  date?: string;
+  physical_health?: {
+    summary?: {
+      physical_summary: PhysicalSummary;
+    };
+  };
+  sleep_health?: {
+    summary?: {
+      sleep_summary: SleepSummary;
+    };
+  };
+}
+
+interface DailyActivityData {
+  steps?: number;
+  calories?: number;
+  distance_meters?: number;
+  sleep_hours?: number;
+}
+
 /**
  * Endpoint para verificar que el webhook está configurado correctamente
  */
@@ -27,7 +73,7 @@ export async function POST(request: Request) {
   console.log('🔑 [Webhook] Headers:', JSON.stringify(Object.fromEntries([...request.headers]), null, 2));
   
   try {
-    const data = await request.json();
+    const data = await request.json() as RookWebhookData;
     console.log('📦 [Webhook] Datos recibidos:', JSON.stringify(data, null, 2));
 
     // Extraer el user_id
@@ -70,14 +116,15 @@ export async function POST(request: Request) {
         message: `Datos de tipo ${dataType} procesados correctamente`
       });
 
-    } catch (processingError: any) {
-      console.error('❌ [Webhook] Error procesando datos:', processingError);
-      await logWebhookData(user_id, dataType, data, processingError.message);
+    } catch (processingError) {
+      const errorMessage = processingError instanceof Error ? processingError.message : 'Unknown error';
+      console.error('❌ [Webhook] Error procesando datos:', errorMessage);
+      await logWebhookData(user_id, dataType, data, errorMessage);
       
       // Retornamos 200 para que Rook no reintente el envío
       return NextResponse.json({
         success: true,
-        warning: `Error interno procesando datos: ${processingError.message}`
+        warning: `Error interno procesando datos: ${errorMessage}`
       });
     }
 
@@ -93,7 +140,7 @@ export async function POST(request: Request) {
 /**
  * Procesa los datos físicos recibidos
  */
-async function processPhysicalData(data: any) {
+async function processPhysicalData(data: RookWebhookData) {
   const { user_id } = data;
   const date = extractDate(data);
   
@@ -120,7 +167,7 @@ async function processPhysicalData(data: any) {
 /**
  * Procesa los datos de sueño recibidos
  */
-async function processSleepData(data: any) {
+async function processSleepData(data: RookWebhookData) {
   const { user_id } = data;
   const date = extractDate(data);
   
@@ -144,7 +191,7 @@ async function processSleepData(data: any) {
 /**
  * Extrae la fecha de los datos recibidos
  */
-function extractDate(data: any): string {
+function extractDate(data: RookWebhookData): string {
   // Intentar obtener la fecha de diferentes ubicaciones en los datos
   let date = data.date;
   
@@ -191,7 +238,7 @@ async function getUserFidFromRookId(rookUserId: string): Promise<string | null> 
 /**
  * Actualiza o crea un registro en daily_activities
  */
-async function updateDailyActivity(userFid: string, date: string, data: any) {
+async function updateDailyActivity(userFid: string, date: string, data: DailyActivityData) {
   try {
     // Verificar si existe un registro para esa fecha
     const existingRecord = await sql`
@@ -256,7 +303,7 @@ async function updateDailyActivity(userFid: string, date: string, data: any) {
 /**
  * Registra los datos recibidos para análisis posterior
  */
-async function logWebhookData(userId: string, type: string, data: any, errorMessage?: string) {
+async function logWebhookData(userId: string, type: string, data: RookWebhookData, errorMessage?: string) {
   try {
     const date = extractDate(data);
     

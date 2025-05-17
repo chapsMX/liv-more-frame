@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { protoMono } from '../styles/fonts';
 import { useUser } from '../context/UserContext';
@@ -26,6 +26,60 @@ export default function DashboardInicial() {
     sleep: 0
   });
 
+  const checkConnection = useCallback(async () => {
+    try {
+      console.log('🔍 Verificando conexión con la base de datos...');
+      const response = await fetch(`/api/users/check-connection?fid=${userState.userFid}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Si el provider es 'NULL', retornamos null para mantener consistencia
+        return data.connectedProvider === 'NULL' ? null : data.connectedProvider;
+      } else {
+        console.error('❌ Error verificando conexión:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error en la verificación de conexión:', error);
+      return null;
+    }
+  }, [userState.userFid]);
+
+  const checkUserGoals = useCallback(async () => {
+    try {
+      console.log('🎯 Verificando objetivos del usuario:', userState.userFid);
+      const response = await fetch(`/api/users/check-goals?fid=${userState.userFid}`);
+      const data = await response.json();
+      
+      if (data.hasGoals) {
+        // Only update goals if they've changed
+        if (JSON.stringify(goals) !== JSON.stringify(data.goals)) {
+          setGoals(data.goals);
+        }
+        
+        // Only update validation status if it's different
+        if (hasValidGoals !== data.validation.isValid) {
+          setHasValidGoals(data.validation.isValid);
+        }
+        
+        console.log('✅ Estado de objetivos actualizado:', {
+          goals: data.goals,
+          isValid: data.validation.isValid
+        });
+        
+        if (!data.validation.isValid) {
+          console.log('⚠️ Objetivos inválidos - Mostrando modal de actualización');
+          setShowGoalsModal(true);
+        }
+      } else {
+        console.log('⚠️ Usuario sin objetivos - Mostrando modal de configuración');
+        setShowGoalsModal(true);
+      }
+    } catch (error) {
+      console.error('❌ Error verificando objetivos:', error);
+    }
+  }, [userState.userFid, goals, hasValidGoals]);
+
   useEffect(() => {
     const loadUserProfile = async () => {
       const context = await sdk.context;
@@ -46,9 +100,9 @@ export default function DashboardInicial() {
         acceptedTos: userState.acceptedTos,
         acceptedPrivacyPolicy: userState.acceptedPrivacyPolicy,
         canUse: userState.canUse
-    });
+      });
 
-    if (!userState.isWhitelisted || !userState.acceptedTos || !userState.acceptedPrivacyPolicy || !userState.canUse) {
+      if (!userState.isWhitelisted || !userState.acceptedTos || !userState.acceptedPrivacyPolicy || !userState.canUse) {
         console.log('⚠️ Acceso denegado al Dashboard - Permisos insuficientes');
         router.push('/');
         return;
@@ -100,7 +154,15 @@ export default function DashboardInicial() {
     };
 
     checkGoalsAndProvider();
-  }, [initialCheckDone, hasValidGoals]);
+  }, [
+    initialCheckDone,
+    hasValidGoals,
+    checkConnection,
+    checkUserGoals,
+    router,
+    setUserState,
+    userState.connectedProvider
+  ]);
 
   useEffect(() => {
     const fetchHealthMetrics = async () => {
@@ -137,62 +199,8 @@ export default function DashboardInicial() {
 
     if (initialCheckDone && userState.connectedProvider) {
       fetchHealthMetrics();
-        }
+    }
   }, [initialCheckDone, userState.userFid, userState.connectedProvider]);
-
-  const checkConnection = async () => {
-    try {
-      console.log('🔍 Verificando conexión con la base de datos...');
-      const response = await fetch(`/api/users/check-connection?fid=${userState.userFid}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Si el provider es 'NULL', retornamos null para mantener consistencia
-        return data.connectedProvider === 'NULL' ? null : data.connectedProvider;
-    } else {
-        console.error('❌ Error verificando conexión:', data.error);
-        return null;
-    }
-    } catch (error) {
-      console.error('❌ Error en la verificación de conexión:', error);
-      return null;
-    }
-  };
-
-  const checkUserGoals = async () => {
-    try {
-      console.log('🎯 Verificando objetivos del usuario:', userState.userFid);
-      const response = await fetch(`/api/users/check-goals?fid=${userState.userFid}`);
-      const data = await response.json();
-      
-      if (data.hasGoals) {
-        // Only update goals if they've changed
-        if (JSON.stringify(goals) !== JSON.stringify(data.goals)) {
-        setGoals(data.goals);
-        }
-        
-        // Only update validation status if it's different
-        if (hasValidGoals !== data.validation.isValid) {
-          setHasValidGoals(data.validation.isValid);
-        }
-        
-        console.log('✅ Estado de objetivos actualizado:', {
-          goals: data.goals,
-          isValid: data.validation.isValid
-        });
-        
-        if (!data.validation.isValid) {
-          console.log('⚠️ Objetivos inválidos - Mostrando modal de actualización');
-          setShowGoalsModal(true);
-        }
-      } else {
-        console.log('⚠️ Usuario sin objetivos - Mostrando modal de configuración');
-        setShowGoalsModal(true);
-      }
-    } catch (error) {
-      console.error('❌ Error verificando objetivos:', error);
-    }
-  };
 
   const handleSaveGoals = async (goals: { calories: number; steps: number; sleep: number }) => {
     try {

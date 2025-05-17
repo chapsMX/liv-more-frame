@@ -22,6 +22,12 @@ export async function GET(request: Request) {
     const authToken = Buffer.from(`${process.env.ROOK_CLIENT_UUID}:${process.env.ROOK_CLIENT_SECRET}`).toString('base64');
 
     // Llamar a la API de Rook para verificar conexiones
+    console.log('🔑 Intentando conexión con Rook API:', {
+      url: `${ROOK_CONFIG.API_URL}/api/v1/user_id/${fid}/data_sources/authorized`,
+      clientUuid: process.env.ROOK_CLIENT_UUID?.substring(0, 5) + '...',
+      hasSecret: !!process.env.ROOK_CLIENT_SECRET
+    });
+
     const response = await fetch(
       `${ROOK_CONFIG.API_URL}/api/v1/user_id/${fid}/data_sources/authorized`,
       {
@@ -33,9 +39,14 @@ export async function GET(request: Request) {
     );
 
     if (!response.ok) {
-      console.error('❌ Error al verificar conexiones:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error detallado al verificar conexiones:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText
+      });
       return NextResponse.json(
-        { error: 'Error checking Rook connections' },
+        { error: 'Error checking Rook connections', details: errorText },
         { status: response.status }
       );
     }
@@ -45,7 +56,7 @@ export async function GET(request: Request) {
 
     // Verificar si hay algún dispositivo conectado
     const connectedDevices = Object.entries(data.sources)
-      .filter(([_, isConnected]) => isConnected)
+      .filter(([, isConnected]) => isConnected)
       .map(([device]) => device);
 
     if (connectedDevices.length > 0) {

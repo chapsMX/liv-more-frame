@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import RookDeviceConnection from '@/components/RookDeviceConnection';
 
 export default function RookCallbackPage() {
   const router = useRouter();
