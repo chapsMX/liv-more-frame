@@ -5,8 +5,8 @@ export const ROOK_URLS = {
     API: 'https://api.rook-connect.review'
   },
   PRODUCTION: {
-    CONNECTIONS: 'https://connections.rook-connect.com',
-    API: 'https://api.rook-connect.com'
+    CONNECTIONS: 'https://connections.rook-connect.review',
+    API: 'https://api.rook-connect.review'
   }
 } as const;
 
@@ -14,9 +14,10 @@ export const ROOK_URLS = {
 export const CURRENT_ENV = process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX';
 
 export const ROOK_CONFIG = {
-  CLIENT_UUID: '88616d20-da51-4d31-b9a8-436f02e3ca98',
-  CONNECTIONS_URL: ROOK_URLS[CURRENT_ENV].CONNECTIONS,
-  API_URL: ROOK_URLS[CURRENT_ENV].API,
+  // Usar CLIENT_UUID de variables de entorno, con fallback al valor de sandbox
+  CLIENT_UUID: process.env.NEXT_PUBLIC_ROOK_CLIENT_UUID || '88616d20-da51-4d31-b9a8-436f02e3ca98',
+  CONNECTIONS_URL: ROOK_URLS.SANDBOX.CONNECTIONS,
+  API_URL: ROOK_URLS.SANDBOX.API,
   // URL base de la aplicación (se configura dinámicamente en el cliente)
   getAppBaseUrl: () => {
     if (typeof window === 'undefined') return 'https://app.livmore.life';

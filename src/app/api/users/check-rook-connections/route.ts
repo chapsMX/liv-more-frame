@@ -18,6 +18,19 @@ export async function GET(request: Request) {
 
     console.log('🔍 Verificando conexiones de Rook para usuario:', fid);
 
+    // Validar que tenemos las credenciales necesarias
+    if (!process.env.ROOK_CLIENT_UUID || !process.env.ROOK_CLIENT_SECRET) {
+      console.error('❌ Error: Faltan credenciales de Rook:', {
+        hasClientUuid: !!process.env.ROOK_CLIENT_UUID,
+        hasClientSecret: !!process.env.ROOK_CLIENT_SECRET,
+        environment: process.env.NODE_ENV
+      });
+      return NextResponse.json(
+        { error: 'Missing Rook credentials' },
+        { status: 500 }
+      );
+    }
+
     // Crear el Basic Auth token para la verificación en Rook
     const authToken = Buffer.from(`${process.env.ROOK_CLIENT_UUID}:${process.env.ROOK_CLIENT_SECRET}`).toString('base64');
 
@@ -25,7 +38,9 @@ export async function GET(request: Request) {
     console.log('🔑 Intentando conexión con Rook API:', {
       url: `${ROOK_CONFIG.API_URL}/api/v1/user_id/${fid}/data_sources/authorized`,
       clientUuid: process.env.ROOK_CLIENT_UUID?.substring(0, 5) + '...',
-      hasSecret: !!process.env.ROOK_CLIENT_SECRET
+      hasSecret: !!process.env.ROOK_CLIENT_SECRET,
+      environment: process.env.NODE_ENV,
+      apiUrl: ROOK_CONFIG.API_URL
     });
 
     const response = await fetch(
