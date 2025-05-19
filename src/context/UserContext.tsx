@@ -12,6 +12,7 @@ export interface UserState {
   userFid?: number;
   ethAddress?: string;
   connectedProvider?: string;
+  pfpUrl?: string;
 }
 
 interface UserContextType {

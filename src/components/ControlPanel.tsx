@@ -5,6 +5,8 @@ import { protoMono } from '../styles/fonts';
 import { useUser } from '../context/UserContext';
 import DGModal from './DGModal';
 import { validateGoals } from '@/constants/goals';
+import Image from 'next/image';
+import sdk from "@farcaster/frame-sdk";
 
 interface ControlPanelProps {
   onClose: () => void;
@@ -39,6 +41,18 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
   const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(true);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [pfpUrl, setPfpUrl] = useState<string>();
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const context = await sdk.context;
+      if (context.user?.pfpUrl) {
+        setPfpUrl(context.user.pfpUrl);
+      }
+    };
+
+    loadUserProfile();
+  }, []);
 
   const fetchUserGoals = useCallback(async () => {
     try {
@@ -178,8 +192,19 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
         </button>
 
         <div className={`${protoMono.className} space-y-6`}>
-          <h2 className="text-xl font-bold text-white">Control Panel</h2>
-          
+          {/* profile picture del usuario */}
+          <div className="flex justify-center items-center">
+            {pfpUrl && (
+              <Image 
+                src={pfpUrl}
+                alt={`${userState.username}'s profile`}
+                width={150}
+                height={150}
+                className="rounded-full border-2 border-gray-700"
+                unoptimized
+              />
+            )}
+          </div>
           {/* Información del Usuario */}
           <div className="space-y-2">
             <div className="flex justify-between items-center py-2 border-b border-gray-700">
@@ -197,7 +222,7 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
                 <span className="text-gray-400">Daily Goals</span>
                 <button
                   onClick={() => setShowGoalsModal(true)}
-                  className="text-violet-400 hover:text-violet-300 transition-colors text-sm flex items-center gap-1"
+                  className="text-violet-800 hover:text-violet-500 transition-colors text-sm flex items-center gap-1"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />

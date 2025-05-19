@@ -43,4 +43,4 @@ export const SUPPORTED_DEVICES = [
 
 // Tipos para TypeScript
 export type RookEnvironment = keyof typeof ROOK_URLS;
-export type SupportedDevice = typeof SUPPORTED_DEVICES[number]; 
+export type SupportedDevice = typeof SUPPORTED_DEVICES[number];
