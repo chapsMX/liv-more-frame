@@ -34,10 +34,10 @@ export default function DGModal({ onSave, initialGoals }: GoalsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2">
-      <div className="bg-[#1C1F2A] p-6 rounded-3xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 z-50">
+      <div className="bg-[#1C1F2A] p-6 rounded-3xl w-full max-w-md relative">
         <h2 className={`text-md text-center font-bold mb-2 text-white ${protoMono.className}`}>
-        Let’s start strong, set your daily goals to begin tracking your progress.<br />
+        Let&apos;s start strong, set your daily goals to begin tracking your progress.<br />
         <span className="text-gray-400 text-left text-xs">*You can adjust them anytime as you go.</span>
         </h2>
 

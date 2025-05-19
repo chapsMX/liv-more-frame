@@ -422,281 +422,284 @@ export default function DashboardInicial() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Header */}
-        <div className="flex justify-between items-center w-full max-w-2xl mb-2">
-          <div className="flex items-center">
-            <Image
-              src="/livMore_w.png"
-              alt="Liv More"
-              width={60}
-              height={60}
-              priority
-            />
-          </div>
-          
-          {/* User Profile with Kebab Menu */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-2 py-1 bg-gray-800 rounded-full text-white min-w-[150px] border-2 border-gray-700">
-              {pfpUrl && (
+    <div className="min-h-screen bg-black text-white">
+      {showGoalsModal && (
+        <DGModal
+          onSave={handleSaveGoals}
+          initialGoals={goals}
+        />
+      )}
+      
+      {!showGoalsModal && (
+        <>
+          <div className="container mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="flex justify-between items-center w-full max-w-2xl mb-2">
+              <div className="flex items-center">
                 <Image
-                  src={pfpUrl}
-                  alt="Profile"
-                  width={32}
-                  height={32}
-                  className="rounded-full border-2 border-gray-700"
-                  unoptimized
+                  src="/livMore_w.png"
+                  alt="Liv More"
+                  width={60}
+                  height={60}
+                  priority
                 />
-              )}
-              <span className={`text-base font-semibold ${protoMono.className}`}>
-                {userState.username}
-              </span>
-              <button 
-                onClick={() => setShowControlPanel(true)}
-                className="ml-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Contenido principal del dashboard */}
-        <div className="flex flex-col items-center justify-center space-y-6 p-2">
-          {/* Primera fila: Título */}
-          <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
-            Daily Activity
-          </h1>
-
-          {/* Segunda fila: Fecha actual */}
-          <div className={`text-xl text-gray-400 mb-4 ${protoMono.className}`}>
-            {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </div>
-
-          {/* Tercera fila: Métricas con íconos */}
-          <div className="grid grid-cols-3 mb-2 gap-8 w-full max-w-4xl">
-            {/* Calorías */}
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full border-4 border-orange-500 flex items-center justify-center bg-black">
-                  <CaloriesIcon className="w-12 h-12 text-orange-500" />
-                </div>
               </div>
-              <div className="mt-4 text-center">
-                <p className={`text-lg font-bold ${protoMono.className}`}>
-                  <span className="text-white">{healthMetrics.calories}</span>
-                  <span className="text-gray-500">/{goals.calories}</span>
-                </p>
-                <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
-                  CALORIES
-                </p>
-              </div>
-            </div>
-
-            {/* Pasos */}
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full border-4 border-green-500 flex items-center justify-center bg-black">
-                  <StepsIcon className="w-12 h-12 text-green-500" />
-                </div>
-              </div>
-              <div className="mt-4 text-center">
-                <p className={`text-lg font-bold ${protoMono.className}`}>
-                  <span className="text-white">{healthMetrics.steps}</span>
-                  <span className="text-gray-500">/{goals.steps}</span>
-                </p>
-                <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
-                  STEPS
-                </p>
-              </div>
-            </div>
-
-            {/* Sueño */}
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full border-4 border-blue-500 flex items-center justify-center bg-black">
-                  <SleepIcon className="w-12 h-12 text-blue-500" />
-                </div>
-              </div>
-              <div className="mt-4 text-center">
-                <p className={`text-lg font-bold ${protoMono.className}`}>
-                  <span className="text-white">{healthMetrics.sleep}</span>
-                  <span className="text-gray-500">/{goals.sleep}h</span>
-                </p>
-                <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
-                  SLEEP
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Cuarta fila: Progreso Diario */}
-          <div className="mt-2 w-full mb-0 max-w-4xl">
-            <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-              <p className={`text-lg mb-0 font-bold text-white`}>
-                Daily Progress: {calculateDailyProgress()}%
-              </p>
-              <p className={`text-base text-gray-300`}>
-                {getProgressMessage()}
-                {calculateDailyProgress() === 100 && (
-                  <span 
-                    onClick={handleShare}
-                    className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
-                  >
-                  Share to Farcaster
+              
+              {/* User Profile with Kebab Menu */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-2 py-1 bg-gray-800 rounded-full text-white min-w-[150px] border-2 border-gray-700">
+                  {pfpUrl && (
+                    <Image
+                      src={pfpUrl}
+                      alt="Profile"
+                      width={32}
+                      height={32}
+                      className="rounded-full border-2 border-gray-700"
+                      unoptimized
+                    />
+                  )}
+                  <span className={`text-base font-semibold ${protoMono.className}`}>
+                    {userState.username}
                   </span>
-                )}
-              </p>
+                  <button 
+                    onClick={() => setShowControlPanel(true)}
+                    className="ml-2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Quinta fila: Actividad Semanal */}
-          <div className="mt-2 w-full max-w-4xl border-t border-gray-800 pt-2">
-            <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-              <h2 className={`text-2xl text-center font-bold text-white mb-0`}>
-                Weekly Activity
-              </h2>
-              <div className={`text-xl text-center text-gray-400`}>
-                {getWeekDateRange()}
+            {/* Contenido principal del dashboard */}
+            <div className="flex flex-col items-center justify-center space-y-6 p-2">
+              {/* Primera fila: Título */}
+              <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
+                Daily Activity
+              </h1>
+
+              {/* Segunda fila: Fecha actual */}
+              <div className={`text-xl text-gray-400 mb-4 ${protoMono.className}`}>
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               </div>
 
-              {/* Métricas semanales */}
-              <div className="mt-6 space-y-6">
+              {/* Tercera fila: Métricas con íconos */}
+              <div className="grid grid-cols-3 mb-2 gap-8 w-full max-w-4xl">
                 {/* Calorías */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <CaloriesIcon className="w-6 h-6 text-violet-500 mr-2" />
-                      <span className="text-white font-semibold">Calories</span>
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-orange-500 flex items-center justify-center bg-black">
+                      <CaloriesIcon className="w-12 h-12 text-orange-500" />
                     </div>
-                    <span className="text-gray-400 text-sm">
-                      Week: {calculateWeeklyTotal(weeklyMetrics.calories).toLocaleString()}
-                    </span>
                   </div>
-                  <div className="bg-[#0B1222] rounded-xl p-6">
-                    <div className="flex justify-between h-[200px] mb-4">
-                      {weeklyMetrics.calories.map((day, index) => (
-                        <div key={index} className="flex flex-col items-center justify-end h-full w-full">
-                          <div className="w-8 h-full relative flex items-end">
-                            <div 
-                              className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
-                              style={{ 
-                                height: `${calculateBarHeight(day.value, weeklyMetrics.calories)}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-6 gap-1 text-center pt-2">
-                      {weeklyMetrics.calories.map((day, index) => (
-                        <div key={`label-${index}`} className="flex flex-col items-center">
-                          <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                          <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="mt-4 text-center">
+                    <p className={`text-lg font-bold ${protoMono.className}`}>
+                      <span className="text-white">{healthMetrics.calories}</span>
+                      <span className="text-gray-500">/{goals.calories}</span>
+                    </p>
+                    <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
+                      CALORIES
+                    </p>
                   </div>
                 </div>
 
                 {/* Pasos */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <StepsIcon className="w-6 h-6 text-violet-500 mr-2" />
-                      <span className="text-white font-semibold">Steps</span>
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-green-500 flex items-center justify-center bg-black">
+                      <StepsIcon className="w-12 h-12 text-green-500" />
                     </div>
-                    <span className="text-gray-400 text-sm">
-                      Week: {calculateWeeklyTotal(weeklyMetrics.steps).toLocaleString()}
-                    </span>
                   </div>
-                  <div className="bg-[#0B1222] rounded-xl p-6">
-                    <div className="flex justify-between h-[200px] mb-4">
-                      {weeklyMetrics.steps.map((day, index) => (
-                        <div key={index} className="flex flex-col items-center justify-end h-full w-full">
-                          <div className="w-8 h-full relative flex items-end">
-                            <div 
-                              className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
-                              style={{ 
-                                height: `${calculateBarHeight(day.value, weeklyMetrics.steps)}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-6 gap-1 text-center pt-2">
-                      {weeklyMetrics.steps.map((day, index) => (
-                        <div key={`label-${index}`} className="flex flex-col items-center">
-                          <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                          <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="mt-4 text-center">
+                    <p className={`text-lg font-bold ${protoMono.className}`}>
+                      <span className="text-white">{healthMetrics.steps}</span>
+                      <span className="text-gray-500">/{goals.steps}</span>
+                    </p>
+                    <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
+                      STEPS
+                    </p>
                   </div>
                 </div>
 
                 {/* Sueño */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <SleepIcon className="w-6 h-6 text-violet-500 mr-2" />
-                      <span className="text-white font-semibold">Sleep</span>
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-blue-500 flex items-center justify-center bg-black">
+                      <SleepIcon className="w-12 h-12 text-blue-500" />
                     </div>
-                    <span className="text-gray-400 text-sm">
-                      Avg: {calculateWeeklyAverage(weeklyMetrics.sleep)}h
-                    </span>
                   </div>
-                  <div className="bg-[#0B1222] rounded-xl p-6">
-                    <div className="flex justify-between h-[200px] mb-4">
-                      {weeklyMetrics.sleep.map((day, index) => (
-                        <div key={index} className="flex flex-col items-center justify-end h-full w-full">
-                          <div className="w-8 h-full relative flex items-end">
-                            <div 
-                              className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
-                              style={{ 
-                                height: `${calculateBarHeight(day.value, weeklyMetrics.sleep)}%`
-                              }}
-                            />
-                          </div>
+                  <div className="mt-4 text-center">
+                    <p className={`text-lg font-bold ${protoMono.className}`}>
+                      <span className="text-white">{healthMetrics.sleep}</span>
+                      <span className="text-gray-500">/{goals.sleep}h</span>
+                    </p>
+                    <p className={`text-sm text-gray-400 uppercase tracking-wide ${protoMono.className}`}>
+                      SLEEP
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cuarta fila: Progreso Diario */}
+              <div className="mt-2 w-full mb-0 max-w-4xl">
+                <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
+                  <p className={`text-lg mb-0 font-bold text-white`}>
+                    Daily Progress: {calculateDailyProgress()}%
+                  </p>
+                  <p className={`text-base text-gray-300`}>
+                    {getProgressMessage()}
+                    {calculateDailyProgress() === 100 && (
+                      <span 
+                        onClick={handleShare}
+                        className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
+                      >
+                      Share to Farcaster
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quinta fila: Actividad Semanal */}
+              <div className="mt-2 w-full max-w-4xl border-t border-gray-800 pt-2">
+                <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
+                  <h2 className={`text-2xl text-center font-bold text-white mb-0`}>
+                    Weekly Activity
+                  </h2>
+                  <div className={`text-xl text-center text-gray-400`}>
+                    {getWeekDateRange()}
+                  </div>
+
+                  {/* Métricas semanales */}
+                  <div className="mt-6 space-y-6">
+                    {/* Calorías */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <CaloriesIcon className="w-6 h-6 text-violet-500 mr-2" />
+                          <span className="text-white font-semibold">Calories</span>
                         </div>
-                      ))}
+                        <span className="text-gray-400 text-sm">
+                          Week: {calculateWeeklyTotal(weeklyMetrics.calories).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="bg-[#0B1222] rounded-xl p-6">
+                        <div className="flex justify-between h-[200px] mb-4">
+                          {weeklyMetrics.calories.map((day, index) => (
+                            <div key={index} className="flex flex-col items-center justify-end h-full w-full">
+                              <div className="w-8 h-full relative flex items-end">
+                                <div 
+                                  className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
+                                  style={{ 
+                                    height: `${calculateBarHeight(day.value, weeklyMetrics.calories)}%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                          {weeklyMetrics.calories.map((day, index) => (
+                            <div key={`label-${index}`} className="flex flex-col items-center">
+                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
+                              <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-6 gap-1 text-center pt-2">
-                      {weeklyMetrics.sleep.map((day, index) => (
-                        <div key={`label-${index}`} className="flex flex-col items-center">
-                          <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                          <span className="text-gray-500 text-sm">{`${day.value}h`}</span>
+
+                    {/* Pasos */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <StepsIcon className="w-6 h-6 text-violet-500 mr-2" />
+                          <span className="text-white font-semibold">Steps</span>
                         </div>
-                      ))}
+                        <span className="text-gray-400 text-sm">
+                          Week: {calculateWeeklyTotal(weeklyMetrics.steps).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="bg-[#0B1222] rounded-xl p-6">
+                        <div className="flex justify-between h-[200px] mb-4">
+                          {weeklyMetrics.steps.map((day, index) => (
+                            <div key={index} className="flex flex-col items-center justify-end h-full w-full">
+                              <div className="w-8 h-full relative flex items-end">
+                                <div 
+                                  className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
+                                  style={{ 
+                                    height: `${calculateBarHeight(day.value, weeklyMetrics.steps)}%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                          {weeklyMetrics.steps.map((day, index) => (
+                            <div key={`label-${index}`} className="flex flex-col items-center">
+                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
+                              <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sueño */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <SleepIcon className="w-6 h-6 text-violet-500 mr-2" />
+                          <span className="text-white font-semibold">Sleep</span>
+                        </div>
+                        <span className="text-gray-400 text-sm">
+                          Avg: {calculateWeeklyAverage(weeklyMetrics.sleep)}h
+                        </span>
+                      </div>
+                      <div className="bg-[#0B1222] rounded-xl p-6">
+                        <div className="flex justify-between h-[200px] mb-4">
+                          {weeklyMetrics.sleep.map((day, index) => (
+                            <div key={index} className="flex flex-col items-center justify-end h-full w-full">
+                              <div className="w-8 h-full relative flex items-end">
+                                <div 
+                                  className={`w-full rounded-sm transition-all duration-300 ease-in-out ${day.percentage >= 100 ? 'bg-green-500' : 'bg-violet-500'}`}
+                                  style={{ 
+                                    height: `${calculateBarHeight(day.value, weeklyMetrics.sleep)}%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                          {weeklyMetrics.sleep.map((day, index) => (
+                            <div key={`label-${index}`} className="flex flex-col items-center">
+                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
+                              <span className="text-gray-500 text-sm">{`${day.value}h`}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Control Panel Modal */}
-      {showControlPanel && (
-        <ControlPanel onClose={() => setShowControlPanel(false)} />
-      )}
-
-      {/* Goals Modal */}
-      {showGoalsModal && (
-        <DGModal 
-          onSave={handleSaveGoals}
-          initialGoals={goals}
-        />
+          {/* Control Panel Modal */}
+          {showControlPanel && (
+            <ControlPanel onClose={() => setShowControlPanel(false)} />
+          )}
+        </>
       )}
     </div>
   );
