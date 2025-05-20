@@ -236,8 +236,8 @@ export default function DashboardInicial() {
         const rookUserData = await rookUserResponse.json();
         const rookUserId = rookUserData.rook_user_id;
         
-        // Obtener datos para los últimos 6 días
-        const today = new Date();
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const today = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
         const weeklyData: {
           calories: { value: number; percentage: number }[];
           steps: { value: number; percentage: number }[];
@@ -248,7 +248,7 @@ export default function DashboardInicial() {
           sleep: []
         };
 
-        for (let i = 6; i >= 1; i--) {
+        for (let i = 7; i >= 1; i--) {
           const date = new Date(today);
           date.setDate(today.getDate() - i);
           const dateStr = date.toISOString().split('T')[0];
@@ -343,13 +343,16 @@ export default function DashboardInicial() {
 
   const handleShare = async () => {
     try {
+      const imageID = userState.userFid;
+      const time = Math.floor(Date.now() / 1000);
+      const shareID = `${imageID}-${time}`;
       const achievementText = `🎉 I completed my daily goals on @livmore!\n\n` +
         `🔥 Calories: ${healthMetrics.calories}/${goals.calories}\n` +
         `👣 Steps: ${healthMetrics.steps}/${goals.steps}\n` +
         `😴 Sleep: ${healthMetrics.sleep}/${goals.sleep}h\n\n` +
         `💪 Turn healthy habits into rewards! 🧬`;
       
-      const url = "https://app.livmore.life";
+      const url = `${process.env.NEXT_PUBLIC_URL}/di-daily/${shareID}`;
       
       await sdk.actions.openUrl(
         `https://warpcast.com/~/compose?text=${encodeURIComponent(achievementText)}&embeds[]=${encodeURIComponent(url)}`
@@ -360,39 +363,33 @@ export default function DashboardInicial() {
   };
 
   function getWeekDateRange() {
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
-    
-    // Calculate the start of the week (Monday)
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
-    
-    // Calculate the end of the week (Sunday), excluding today
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - 1); // Yesterday
-    
-    // Format dates
-    const formatDate = (date: Date) => {
-      return date.toLocaleDateString('en-US', { 
-        month: 'long',
-        day: 'numeric'
-      });
-    };
-    
-    return `${formatDate(monday)} - ${formatDate(sunday)}`;
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
+    const end = new Date(today);
+    end.setDate(today.getDate() - 1); // ayer
+    const start = new Date(today);
+    start.setDate(today.getDate() - 7); // hace 7 días
+
+    const formatDate = (date: Date) => date.toLocaleDateString('en-US', {
+      timeZone: userTimezone,
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `${formatDate(start)} - ${formatDate(end)}`;
   }
 
   function getWeekDays() {
-    const today = new Date();
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
     const days = [];
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
-    for (let i = 6; i >= 1; i--) {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    for (let i = 7; i >= 1; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      days.push(dayNames[date.getDay() === 0 ? 6 : date.getDay() - 1]);
+      days.push(dayNames[date.getDay()]);
     }
-    
     return days;
   }
 
@@ -432,7 +429,7 @@ export default function DashboardInicial() {
       
       {!showGoalsModal && (
         <>
-          <div className="container mx-auto px-4 py-8">
+          <div className="container mx-auto px-4 py-2">
             {/* Header */}
             <div className="flex justify-between items-center w-full max-w-2xl mb-2">
               <div className="flex items-center">
@@ -605,7 +602,7 @@ export default function DashboardInicial() {
                             </div>
                           ))}
                         </div>
-                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                        <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.calories.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
                               <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
@@ -642,7 +639,7 @@ export default function DashboardInicial() {
                             </div>
                           ))}
                         </div>
-                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                        <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.steps.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
                               <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
@@ -679,7 +676,7 @@ export default function DashboardInicial() {
                             </div>
                           ))}
                         </div>
-                        <div className="grid grid-cols-6 gap-1 text-center pt-2">
+                        <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.sleep.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
                               <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>

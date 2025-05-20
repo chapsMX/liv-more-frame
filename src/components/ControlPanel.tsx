@@ -7,6 +7,7 @@ import DGModal from './DGModal';
 import { validateGoals } from '@/constants/goals';
 import Image from 'next/image';
 import sdk from "@farcaster/frame-sdk";
+import { useRouter } from 'next/navigation';
 
 interface ControlPanelProps {
   onClose: () => void;
@@ -35,6 +36,7 @@ interface RookResponse {
 
 export function ControlPanel({ onClose }: ControlPanelProps) {
   const { userState } = useUser();
+  const router = useRouter();
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [goals, setGoals] = useState<UserGoals | null>(null);
   const [goalsValidation, setGoalsValidation] = useState<ReturnType<typeof validateGoals> | null>(null);
@@ -178,6 +180,11 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
     }
   };
 
+  const handleNavigation = (path: string) => {
+    onClose(); // Close the control panel
+    router.push(path); // Use Next.js router for internal navigation
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
       <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 relative">
@@ -205,15 +212,30 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
               />
             )}
           </div>
-          {/* Información del Usuario */}
+
+          {/* New Navigation Rows */}
           <div className="space-y-2">
-            <div className="flex justify-between items-center py-2 border-b border-gray-700">
-              <span className="text-gray-400">Username</span>
-              <span className="text-white">{userState.username}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-700">
-              <span className="text-gray-400">Display Name</span>
-              <span className="text-white">{userState.displayName}</span>
+            <button 
+              onClick={() => handleNavigation('/attestations')}
+              className="w-full flex justify-between items-center py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-800 transition-colors"
+            >
+              <span className="text-gray-400">Attestations</span>
+              <span className="text-white">→</span>
+            </button>
+            <button 
+              onClick={() => handleNavigation('/challenges')}
+              className="w-full flex justify-between items-center py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-800 transition-colors"
+            >
+              <span className="text-gray-400">Challenges</span>
+              <span className="text-white">→</span>
+            </button>
+            <button 
+              onClick={() => handleNavigation('/badges')}
+              className="w-full flex justify-between items-center py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-800 transition-colors"
+            >
+              <span className="text-gray-400">Badges</span>
+              <span className="text-white">→</span>
+            </button>
             </div>
 
             {/* Daily Goals Section */}
@@ -294,17 +316,11 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
                   No devices connected
                 </div>
               )}
-            </div>
           </div>
 
-          {/* Opciones */}
-          <div className="space-y-2">
-            <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Help
-            </button>
+          {/* Version Information */}
+          <div className="text-center text-gray-500 text-sm mt-6">
+            Version 0.1.1
           </div>
         </div>
       </div>

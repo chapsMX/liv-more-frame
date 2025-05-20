@@ -13,6 +13,7 @@ export interface UserState {
   ethAddress?: string;
   connectedProvider?: string;
   pfpUrl?: string;
+  can_create?: boolean;
 }
 
 interface UserContextType {
@@ -29,6 +30,7 @@ const initialState: UserState = {
   acceptedPrivacyPolicy: false,
   canUse: false,
   connectedProvider: undefined,
+  can_create: false,
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -48,6 +50,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('livmore_user_state', JSON.stringify(userState));
     }
   }, [userState]);
+
+  useEffect(() => {
+    // Cargar can_create desde la base de datos cuando haya userFid
+    const fetchCanCreate = async () => {
+      if (!userState.userFid) return;
+      try {
+        const res = await fetch(`/api/users/check-permissions?fid=${userState.userFid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUserState({ can_create: !!data.can_create });
+        }
+      } catch (err) {
+        console.error('Error fetching can_create:', err);
+      }
+    };
+    fetchCanCreate();
+  }, [userState.userFid]);
 
   const setUserState = (newState: Partial<UserState>) => {
     setUserStateInternal(prev => ({
