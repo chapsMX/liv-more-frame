@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useUser } from '../context/UserContext';
 import { protoMono } from '../styles/fonts';
 import sdk from "@farcaster/frame-sdk";
+import { ShareIcon } from '@/styles/svg';
 
 type Challenge = {
   id: number;
@@ -33,6 +34,137 @@ type Participant = {
   pfp_url?: string;
 };
 
+
+type InviteFriendsModalProps = {
+  onInvite: (selectedFids: string[]) => void;
+  onClose: () => void;
+  currentFid: number;
+};
+
+function InviteFriendsModal({ onInvite, onClose, currentFid }: InviteFriendsModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<{ fid: number; username?: string; pfp_url?: string }[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
+
+  useEffect(() => {
+    setLoading(true);
+    setUsers([]);
+    setSelected([]);
+    fetch(`/api/neynar/replies?fid=${currentFid}&limit=20`)
+      .then(res => res.json())
+      .then(async data => {
+        const seen = new Set<number>();
+        const userList: { fid: number; username?: string; pfp_url?: string }[] = [];
+        type NeynarProfile = { fid: number; username?: string; pfp_url?: string };
+        type NeynarCast = {
+          parent_author?: { fid?: number };
+          mentioned_profiles?: NeynarProfile[];
+        };
+        (data.casts || []).forEach((cast: NeynarCast) => {
+          if (cast.parent_author && cast.parent_author.fid && cast.parent_author.fid !== currentFid && !seen.has(cast.parent_author.fid)) {
+            seen.add(cast.parent_author.fid);
+            let userInfo = null;
+            if (cast.mentioned_profiles) {
+              userInfo = cast.mentioned_profiles.find((p: NeynarProfile) => p.fid === cast.parent_author!.fid);
+            }
+            userList.push({
+              fid: cast.parent_author.fid,
+              username: userInfo?.username,
+              pfp_url: userInfo?.pfp_url
+            });
+          }
+          (cast.mentioned_profiles || []).forEach((profile: NeynarProfile) => {
+            if (profile.fid !== currentFid && !seen.has(profile.fid)) {
+              seen.add(profile.fid);
+              userList.push({ fid: profile.fid, username: profile.username, pfp_url: profile.pfp_url });
+            }
+          });
+        });
+        const limitedUsers = userList.slice(0, 10);
+        const missingFids = limitedUsers.filter(u => !u.username || !u.pfp_url).map(u => u.fid);
+        if (missingFids.length > 0) {
+          const resp = await fetch(`/api/neynar/users?fids=${missingFids.join(',')}`);
+          const profileData = await resp.json();
+          if (profileData.users && Array.isArray(profileData.users)) {
+            const profileMap = new Map<number, { username: string; pfp_url: string }>();
+            profileData.users.forEach((user: NeynarProfile) => {
+              profileMap.set(user.fid, { username: user.username || '', pfp_url: user.pfp_url || '' });
+            });
+            for (const u of limitedUsers) {
+              if ((!u.username || !u.pfp_url) && profileMap.has(u.fid)) {
+                const info = profileMap.get(u.fid)!;
+                u.username = u.username || info.username;
+                u.pfp_url = u.pfp_url || info.pfp_url;
+              }
+            }
+          }
+        }
+        setUsers(limitedUsers);
+      })
+      .finally(() => setLoading(false));
+  }, [currentFid]);
+
+  function toggle(fid: number) {
+    setSelected(sel => sel.includes(fid) ? sel.filter(f => f !== fid) : [...sel, fid]);
+  }
+
+  function handleInviteWithUsernames() {
+    // Map selected FIDs to usernames (with fallback to fid if username missing)
+    const mentions = selected.map(fid => {
+      const user = users.find(u => u.fid === fid);
+      return user?.username ? `@${user.username}` : `@fid:${fid}`;
+    });
+    onInvite(mentions);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+      <div className="bg-gray-900 p-6 rounded-xl border-2 border-gray-700 max-w-md w-full">
+        <h2 className="text-xl font-bold mb-4 text-white">Invite friends to your challenge</h2>
+        <div className="flex flex-col gap-3 mb-4">
+          {loading ? (
+            <span className="text-gray-400">Loading users...</span>
+          ) : users.length > 0 ? (
+            users.map((user) => (
+              <label key={user.fid} className="flex items-center gap-3 cursor-pointer">
+                {user.pfp_url && (
+                  <Image
+                    src={user.pfp_url}
+                    alt={user.username || 'User'}
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-full border border-gray-700"
+                    unoptimized
+                  />
+                )}
+                <span className="text-white">{user.username || `User ${user.fid}`}</span>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(user.fid)}
+                  onChange={() => toggle(user.fid)}
+                  className="ml-auto"
+                />
+              </label>
+            ))
+          ) : (
+            <span className="text-gray-400">No users found to invite.</span>
+          )}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-700 rounded text-white">Cancel</button>
+          <button
+            onClick={handleInviteWithUsernames}
+            className="px-4 py-2 bg-violet-600 rounded text-white font-bold"
+            disabled={selected.length === 0}
+          >
+            Invite
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChallengeDetail() {
   const router = useRouter();
   const params = useParams();
@@ -44,6 +176,7 @@ export default function ChallengeDetail() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [alreadyJoined, setAlreadyJoined] = useState(false);
   const [pfpUrl, setPfpUrl] = useState<string>();
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   useEffect(() => {
     const fetchChallenge = async () => {
@@ -112,6 +245,30 @@ export default function ChallengeDetail() {
     }
   };
 
+  const handleShare = async () => {
+    setShowInviteModal(true);
+  };
+
+  async function handleInvite(mentions: string[]) {
+    if (!challenge) return;
+    try {
+      let text = '';
+      if (alreadyJoined || joinStatus === 'joined') {
+        // Joined share
+        const usernames = mentions.map(m => m.replace(/^@/, '')).join(', ');
+        text = `I just joined the challenge: "${challenge.title}" and I'm inviting ${usernames} to join me.`;
+      } else {
+        // Not joined share
+        text = `Check out this challenge: "${challenge.title}"! Join me and let's achieve our goals together! ${mentions.join(' ')}`;
+      }
+      const url = `${process.env.NEXT_PUBLIC_URL}/di-challenge/${challenge.id}`;
+      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+    } catch (error) {
+      console.error('Error sharing challenge:', error);
+    }
+    setShowInviteModal(false);
+  }
+
   return (
     <div className={`min-h-screen bg-black text-white py-2 ${protoMono.className}`}>
       {/* Header fuera del recuadro */}
@@ -176,6 +333,14 @@ export default function ChallengeDetail() {
                 <span className="px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold mb-2">Official</span>
               )}
               <div className="text-gray-400 text-center mb-2">{challenge.description}</div>
+              {/* Share button always visible */}
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-bold border-2 border-violet-700 transition-colors mt-2"
+              >
+                <ShareIcon className="w-5 h-5" />
+                Share Challenge
+              </button>
             </div>
             <div className="flex flex-wrap gap-4 text-xs text-gray-300 mb-4 justify-center">
               <span className="bg-gray-800 px-2 py-1 rounded">Activity: {challenge.activity_type}</span>
@@ -219,7 +384,16 @@ export default function ChallengeDetail() {
               )}
             </div>
             {alreadyJoined || joinStatus === 'joined' ? (
-              <div className="text-green-400 text-center font-bold">You have joined this challenge!</div>
+              <>
+                <div className="text-green-400 text-center font-bold">You have joined this challenge!</div>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex items-center gap-2 mt-4 px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-bold border-2 border-violet-700 transition-colors"
+                >
+                  <ShareIcon className="w-5 h-5" />
+                  Invita a tus amigos a unirse
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleJoin}
@@ -236,6 +410,13 @@ export default function ChallengeDetail() {
         ) : null}
       </div>
       </div>
+      {showInviteModal && (
+        <InviteFriendsModal
+          onInvite={handleInvite}
+          onClose={() => setShowInviteModal(false)}
+          currentFid={Number(userState.userFid)}
+        />
+      )}
     </div>
   );
 } 

@@ -9,17 +9,17 @@ const OBJECTIVE_TYPES = [
   {
     id: 'max_value',
     name: 'Maximum Value',
-    description: 'El participante que alcance el mayor valor gana'
+    /* description: 'El participante que alcance el mayor valor gana' */
   },
   {
     id: 'daily_minimum',
     name: 'Daily Minimum',
-    description: 'Los participantes deben alcanzar un mínimo diario para completar el reto'
+    /* description: 'Los participantes deben alcanzar un mínimo diario para completar el reto' */
   },
   {
     id: 'total_goal',
     name: 'Total Goal',
-    description: 'Los participantes deben alcanzar una meta total en el período del reto'
+    /* description: 'Los participantes deben alcanzar una meta total en el período del reto' */
   }
 ];
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       user_fid,
       title,
       description,
-      activity_type,
+      activity_type_id,
       objective_type,
       goal_amount,
       duration_days,
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     } = await request.json();
 
     // Validar campos requeridos
-    if (!user_fid || !title || !description || !activity_type || !objective_type || 
+    if (!user_fid || !title || !description || !activity_type_id || !objective_type || 
         !goal_amount || !duration_days || !start_date) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -103,11 +103,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar que el tipo de actividad existe
+    // Validar que el tipo de actividad existe por id
     const activityTypeResult = await sql`
-      SELECT id 
+      SELECT id, name 
       FROM activity_types 
-      WHERE name = ${activity_type} AND is_active = true
+      WHERE id = ${activity_type_id} AND is_active = true
     `;
 
     if (activityTypeResult.length === 0) {
@@ -132,6 +132,7 @@ export async function POST(request: Request) {
         creator_fid,
         title,
         description,
+        activity_type_id,
         activity_type,
         objective_type,
         goal_amount,
@@ -148,7 +149,8 @@ export async function POST(request: Request) {
         ${user_fid},
         ${title},
         ${description},
-        ${activity_type},
+        ${activity_type_id},
+        ${activityTypeResult[0].name},
         ${objective_type},
         ${goal_amount},
         ${duration_days},

@@ -25,9 +25,9 @@ export async function GET(
 ) {
   try {
   // 0. Obtener id de la ruta, user y url
-  const { id } = await params;
+    const { id } = await params;
   const [user_fid] = id.split('-'); // Solo el número antes del guion
-  const appUrl = process.env.NEXT_PUBLIC_URL;
+    const appUrl = process.env.NEXT_PUBLIC_URL;
   // 1. Obtener rook_user_id
   const rookUserRes = await fetch(`${appUrl}/api/users/get-rook-user?fid=${user_fid}`);
   const rookUserData = await rookUserRes.json();
@@ -73,22 +73,22 @@ export async function GET(
   const colorText = '#fff';
   const colorWhite = '#fff';
 
-  return new ImageResponse(
-    <div
-    style={{
-      height: "100%",
-      width: "100%",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
+    return new ImageResponse(
+        <div
+          style={{
+            height: "100%",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
       justifyContent: "space-between",
       padding: "40px",
       backgroundImage: `url(data:image/png;base64,${Buffer.from(logoLivMore).toString('base64')})`,
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundColor: "#101827",
-    }}
-  >
+          }}
+        >
       {/* Contenido principal */}
       <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         {/* Título */}
@@ -141,22 +141,22 @@ export async function GET(
         </div>
       </div>
     </div>,
-    {
-      ...size,
-      fonts: [
-        {
+      {
+        ...size,
+        fonts: [
+          {
           name: 'ProtoMono',
-          data: fontData,
+            data: fontData,
           weight: 700,
           style: 'normal',
-        },
-      ],
-    }
-  );
-} catch (e) {
+          },
+        ],
+      }
+    );
+  } catch (e) {
   console.log(`Failed to generate image`, e);
   return new Response(`Failed to generate image`, {
-    status: 500,
-  });
-}
+      status: 500,
+    });
+  }
 }

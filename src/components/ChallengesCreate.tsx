@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useUser } from '../context/UserContext';
 import { useState, useEffect } from 'react';
+import sdk from "@farcaster/frame-sdk";
 
 const ADMIN_FIDS = [20701, 348971, 1020677];
 
@@ -19,7 +20,7 @@ export default function ChallengesCreate() {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    activity_type: '',
+    activity_type_id: '',
     objective_type: '',
     goal_amount: '',
     duration_days: '',
@@ -80,6 +81,7 @@ export default function ChallengesCreate() {
         body: JSON.stringify({
           ...form,
           user_fid: userState.userFid,
+          activity_type_id: parseInt(form.activity_type_id),
           goal_amount: parseInt(form.goal_amount),
           duration_days: parseInt(form.duration_days),
           points_value: form.is_official ? parseInt(form.points_value) : null,
@@ -123,19 +125,15 @@ export default function ChallengesCreate() {
     }
   };
 
-  async function handleInvite(selectedFids: string[]) {
-    console.log('[InviteFriends] Inviting FIDs:', selectedFids);
+  async function handleInvite(mentions: string[]) {
     if (!createdChallenge) return;
-    await fetch('/api/challenges/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        challenge_id: createdChallenge.challenge_id,
-        inviter_fid: userState.userFid,
-        invitee_fids: selectedFids,
-        challenge_title: form.title
-      })
-    });
+    try {
+      const text = `I just created a new challenge: "${form.title}"! Join me and let's achieve our goals together! 🎯\n\n${mentions.join(' ')}`;
+      const url = `${process.env.NEXT_PUBLIC_BASE_URL}/challenges/${createdChallenge.challenge_id}`;
+      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+    } catch (error) {
+      console.error('Error sharing challenge:', error);
+    }
     setShowInviteModal(false);
     router.push('/challenges');
   }
@@ -194,15 +192,15 @@ export default function ChallengesCreate() {
             <div>
               <label className="block text-sm font-medium text-violet-300">Activity type</label>
               <select
-                name="activity_type"
-                value={form.activity_type}
+                name="activity_type_id"
+                value={form.activity_type_id}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-white shadow-sm focus:border-violet-500 focus:ring-violet-500 border-2 px-3 py-2"
               >
                 <option value="">Select an activity</option>
                 {activityTypes.map(type => (
-                  <option key={type.id} value={type.name}>
+                  <option key={type.id} value={type.id}>
                     {type.name}
                   </option>
                 ))}
@@ -354,6 +352,7 @@ export default function ChallengesCreate() {
             setShowInviteModal(false);
             router.push('/challenges');
           }}
+          currentFid={Number(userState.userFid)}
         />
       )}
     </div>
@@ -365,37 +364,127 @@ type InviteFriendsModalProps = {
   friends: Friend[];
   onInvite: (selectedFids: string[]) => void;
   onClose: () => void;
+  currentFid: number;
 };
-function InviteFriendsModal({ friends, onInvite, onClose }: InviteFriendsModalProps) {
-  const [selected, setSelected] = useState<string[]>([]);
-  function toggle(fid: string) {
+
+function InviteFriendsModal({ onInvite, onClose, currentFid }: InviteFriendsModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<{ fid: number; username?: string; pfp_url?: string }[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
+
+  useEffect(() => {
+    setLoading(true);
+    setUsers([]);
+    setSelected([]);
+    fetch(`/api/neynar/replies?fid=${currentFid}&limit=20`)
+      .then(res => res.json())
+      .then(async data => {
+        // Extract unique users from parent_author and mentioned_profiles
+        const seen = new Set<number>();
+        const userList: { fid: number; username?: string; pfp_url?: string }[] = [];
+        type NeynarProfile = { fid: number; username?: string; pfp_url?: string };
+        type NeynarCast = {
+          parent_author?: { fid?: number };
+          mentioned_profiles?: NeynarProfile[];
+        };
+        (data.casts || []).forEach((cast: NeynarCast) => {
+          // 1. Add parent_author (user you replied to)
+          if (cast.parent_author && cast.parent_author.fid && cast.parent_author.fid !== currentFid && !seen.has(cast.parent_author.fid)) {
+            seen.add(cast.parent_author.fid);
+            // Try to get username/pfp_url from mentioned_profiles if available
+            let userInfo = null;
+            if (cast.mentioned_profiles) {
+              userInfo = cast.mentioned_profiles.find((p: NeynarProfile) => p.fid === cast.parent_author!.fid);
+            }
+            userList.push({
+              fid: cast.parent_author.fid,
+              username: userInfo?.username,
+              pfp_url: userInfo?.pfp_url
+            });
+          }
+          // 2. Add mentioned_profiles
+          (cast.mentioned_profiles || []).forEach((profile: NeynarProfile) => {
+            if (profile.fid !== currentFid && !seen.has(profile.fid)) {
+              seen.add(profile.fid);
+              userList.push({ fid: profile.fid, username: profile.username, pfp_url: profile.pfp_url });
+            }
+          });
+        });
+        const limitedUsers = userList.slice(0, 10);
+        // Find FIDs missing username or pfp_url
+        const missingFids = limitedUsers.filter(u => !u.username || !u.pfp_url).map(u => u.fid);
+        if (missingFids.length > 0) {
+          // Fetch missing profiles in batch
+          const resp = await fetch(`/api/neynar/users?fids=${missingFids.join(',')}`);
+          const profileData = await resp.json();
+          if (profileData.users && Array.isArray(profileData.users)) {
+            // Map FID to profile
+            const profileMap = new Map<number, { username: string; pfp_url: string }>();
+            profileData.users.forEach((user: NeynarProfile) => {
+              profileMap.set(user.fid, { username: user.username || '', pfp_url: user.pfp_url || '' });
+            });
+            // Merge info into userList
+            for (const u of limitedUsers) {
+              if ((!u.username || !u.pfp_url) && profileMap.has(u.fid)) {
+                const info = profileMap.get(u.fid)!;
+                u.username = u.username || info.username;
+                u.pfp_url = u.pfp_url || info.pfp_url;
+              }
+            }
+          }
+        }
+        setUsers(limitedUsers);
+      })
+      .finally(() => setLoading(false));
+  }, [currentFid]);
+
+  function toggle(fid: number) {
     setSelected(sel => sel.includes(fid) ? sel.filter(f => f !== fid) : [...sel, fid]);
   }
-  const hasFriends = Array.isArray(friends) && friends.length > 0;
+
+  function handleInviteWithUsernames() {
+    // Map selected FIDs to usernames (with fallback to fid if username missing)
+    const mentions = selected.map(fid => {
+      const user = users.find(u => u.fid === fid);
+      return user?.username ? `@${user.username}` : `@fid:${fid}`;
+    });
+    onInvite(mentions);
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
       <div className="bg-gray-900 p-6 rounded-xl border-2 border-gray-700 max-w-md w-full">
         <h2 className="text-xl font-bold mb-4 text-white">Invite friends to your challenge</h2>
         <div className="flex flex-col gap-3 mb-4">
-          {hasFriends ? friends.map((f) => (
-            <label key={f.user.fid} className="flex items-center gap-3 cursor-pointer">
-              <img src={f.user.pfp_url} alt={f.user.username} className="w-8 h-8 rounded-full border border-gray-700" />
-              <span className="text-white">{f.user.display_name || f.user.username}</span>
-              <input
-                type="checkbox"
-                checked={selected.includes(f.user.fid)}
-                onChange={() => toggle(f.user.fid)}
-                className="ml-auto"
-              />
-            </label>
-          )) : (
-            <span className="text-gray-400">No friends found to invite.</span>
+          {loading ? (
+            <span className="text-gray-400">Loading users...</span>
+          ) : users.length > 0 ? (
+            users.map((user) => (
+              <label key={user.fid} className="flex items-center gap-3 cursor-pointer">
+                {user.pfp_url && (
+                  <img 
+                    src={user.pfp_url} 
+                    alt={user.username || 'User'} 
+                    className="w-8 h-8 rounded-full border border-gray-700" 
+                  />
+                )}
+                <span className="text-white">{user.username || `User ${user.fid}`}</span>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(user.fid)}
+                  onChange={() => toggle(user.fid)}
+                  className="ml-auto"
+                />
+              </label>
+            ))
+          ) : (
+            <span className="text-gray-400">No users found to invite.</span>
           )}
         </div>
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 bg-gray-700 rounded text-white">Cancel</button>
           <button
-            onClick={() => onInvite(selected)}
+            onClick={handleInviteWithUsernames}
             className="px-4 py-2 bg-violet-600 rounded text-white font-bold"
             disabled={selected.length === 0}
           >

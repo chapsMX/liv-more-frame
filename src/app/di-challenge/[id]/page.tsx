@@ -11,7 +11,7 @@ export async function generateMetadata({
   const { id } = await params;
 
   /* const imageUrl = new URL(`${appUrl}/api/og/${id}`); */
-  const imageUrl = new URL(`https://app.livmore.life/api/sharechallenge/${id}`);
+  const imageUrl = new URL(`${appUrl}/api/sharechallenge/${id}`);
 
   const frame = {
     version: "next",
@@ -29,10 +29,10 @@ export async function generateMetadata({
   };
 
   return {
-    title: "LivMore",
+    title: "LivMore Challenge",
     openGraph: {
-      title: "LivMore",
-      description: "Turn Healty Habitos Into Rewards",
+      title: "LivMore Challenge",
+      description: "Join me in this challenge!",
       images: [{ url: imageUrl.toString() }],
     },
     other: {

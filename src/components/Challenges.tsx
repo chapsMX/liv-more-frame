@@ -216,18 +216,28 @@ export default function Challenges() {
             )}
           </div>
         </div>
-      </div>
-                {/* Botón para crear reto */}
-            <center>    {userState.can_create && (
-            <button
-              onClick={() => router.push('/challengescreate')}
-              className="flex items-center gap-2 px-6 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-bold border-2 border-violet-700 transition-colors mb-4"
-            >
-              <AddFrameIcon className="w-5 h-5" />
-              Create Challenge
-            </button>
+        {/* Botón para crear reto */}
+        <div className="flex justify-center gap-4">
+          {userState.can_create && (
+            <>
+              <button
+                onClick={() => router.push('/challengescreate')}
+                className="flex items-center gap-2 px-6 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-bold border-2 border-violet-700 transition-colors mb-4"
+              >
+                <AddFrameIcon className="w-5 h-5" />
+                Challenges
+              </button> <br />
+              <button
+                onClick={() => router.push('/badges')}
+                className="flex items-center gap-2 px-6 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-bold border-2 border-violet-700 transition-colors mb-4"
+              >
+                <AddFrameIcon className="w-5 h-5" />
+                Badges
+              </button>
+            </>
           )}
-          </center>
+        </div>
+      </div>
     </div>
   );
 }
