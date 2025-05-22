@@ -121,8 +121,8 @@ export async function GET(
             style={{
               display: "flex",
               flexDirection: "row",
-              width: "1000px",
-              gap: "40px",
+              width: "1100px",
+              gap: "20px",
               margin: "0 auto",
               marginBottom: "20px",
             }}
@@ -130,9 +130,9 @@ export async function GET(
             {/* Left Column: Description */}
             <div
               style={{
-                flex: 1,
+                flex: 2,
                 color: "white",
-                fontSize: 24,
+                fontSize: 32,
                 fontFamily: "ProtoMono",
                 textAlign: "left",
                 lineHeight: 1.4,
@@ -153,7 +153,7 @@ export async function GET(
                 flexDirection: "column",
                 justifyContent: "flex-start",
                 color: "#FBBF24",
-                fontSize: 24,
+                fontSize: 28,
                 fontFamily: "ProtoMono",
                 background: "rgba(30,30,40,0.7)",
                 borderRadius: "16px",

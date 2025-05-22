@@ -175,6 +175,7 @@ export default function Challenges() {
                         {challenge.is_official && (
                           <span className="ml-2 px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold">Official</span>
                         )}
+                        {challenge.is_official && <span role="img" aria-label="Official Challenge">✅</span>}
                       </div>
                       <div className="flex flex-wrap gap-1 text-xs text-gray-300 mb-0 justify-left w-full">
                         <span className="px-1 py-0">Activity: {challenge.activity_type}</span>

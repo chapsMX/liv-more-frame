@@ -4,16 +4,34 @@ import { protoMono } from '../../../styles/fonts';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { Badge } from '../../../types/badge';
 import { useUser } from '../../../context/UserContext';
 import sdk from "@farcaster/frame-sdk";
+
+// Update the Badge type to include earned_by
+type BadgeDetail = {
+  id: number;
+  name: string;
+  description: string;
+  badge_type: string;
+  category: string;
+  image_url: string;
+  total_supply: number;
+  total_earned: number;
+  created_at: string;
+  earned_by: Array<{
+    fid: number;
+    display_name?: string;
+    username?: string;
+    pfp_url?: string;
+  }>;
+};
 
 export default function BadgeDetail() {
   const router = useRouter();
   const params = useParams();
   const id = params.id;
   const { userState } = useUser();
-  const [badge, setBadge] = useState<Badge | null>(null);
+  const [badge, setBadge] = useState<BadgeDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pfpUrl, setPfpUrl] = useState<string>();
@@ -112,10 +130,10 @@ export default function BadgeDetail() {
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-col items-center justify-center space-y-6 p-2">
-          <div className="w-full max-w-2xl bg-gray-900 border-2 border-gray-700 rounded-xl p-6">
-            <div className="flex flex-col items-center mb-6">
-              <div className="relative w-32 h-32 mb-4">
+        <div className="flex flex-col items-center justify-center space-y-6 p-0">
+          <div className="w-full max-w-6xl bg-gray-900 border-2 border-gray-700 rounded-xl p-6">
+            <div className="flex flex-col items-center mb-2">
+              <div className="relative w-48 h-48 mb-0">
                 <Image
                   src={badge.image_url}
                   alt={badge.name}
@@ -125,7 +143,7 @@ export default function BadgeDetail() {
                 />
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">{badge.name}</h1>
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-2">
                 <span className="px-3 py-1 bg-violet-600 rounded-full text-sm">
                   {badge.badge_type}
                 </span>
@@ -137,26 +155,40 @@ export default function BadgeDetail() {
 
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-white mb-2">Description</h2>
+                <h2 className="text-lg font-semibold text-white mb-2">Description:</h2>
                 <p className="text-gray-300">{badge.description}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-white mb-2">Total Supply</h2>
-                  <p className="text-gray-300">{badge.total_supply}</p>
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white mb-2">Total Earned</h2>
-                  <p className="text-gray-300">{badge.total_earned || 0}</p>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-semibold text-white mb-2">Created</h2>
-                <p className="text-gray-300">
-                  {new Date(badge.created_at).toLocaleDateString()}
-                </p>
+              {/* List of users who earned the badge */}
+              <div className="mb-6">
+                <div className="text-sm text-violet-300 font-bold mb-2">Earned by:</div>
+                {badge.earned_by && badge.earned_by.length > 0 ? (
+                  <div className="flex flex-row flex-wrap gap-4">
+                    {badge.earned_by.map((user: { fid: number; display_name?: string; username?: string; pfp_url?: string; }) => (
+                      <div key={user.fid} className="flex flex-col items-center w-16">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-700 mb-1 bg-gray-800">
+                          {user.pfp_url ? (
+                            <Image
+                              src={user.pfp_url}
+                              alt={user.display_name || user.username || String(user.fid)}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-xl">?</div>
+                          )}
+                        </div>
+                        <div className="text-xs text-center truncate max-w-[56px]">
+                          {user.display_name || user.username || user.fid}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-xs">No users have earned this badge yet.</div>
+                )}
               </div>
             </div>
           </div>
