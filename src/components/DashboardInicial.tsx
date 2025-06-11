@@ -400,7 +400,7 @@ export default function DashboardInicial() {
       let achievementText = '';
       const currentValue = dailyMetrics[metricType];
       const goalValue = goals[metricType];
-      // Select image based on metric type
+      // seleccionamos la imagen de acuerdo al tipo de actividad
       let image_url = '';
       if (metricType === 'sleep') image_url = sleepimage;
       else if (metricType === 'steps') image_url = stepsimage;
@@ -408,20 +408,20 @@ export default function DashboardInicial() {
 
       switch (metricType) {
         case 'steps':
-          achievementText = `🥾 ${goalValue} steps stored onchain! 🥾\n` +
+          achievementText = `🥾 ${currentValue} steps stored onchain! 🥾\n` +
             `Walked ${currentValue} steps today, my goal was ${goalValue}.\n` +
             `One foot in front of the other, and now it's onchain.\n` +
             `Attested on @base. Let's keep moving 💪🧬\n` +
             `@LivMore`;
           break;
         case 'calories':
-          achievementText = `🔥 ${goalValue} calories burned & stored onchain! 🔥\n` +
+          achievementText = `🔥 ${currentValue} calories burned & stored onchain! 🔥\n` +
             `Burned ${currentValue} kcal out of my ${goalValue} kcal goal.\n` +
             `Pushed through and now my effort is stored forever, attested on @base 🧬 💪\n` +
             `@LivMore`;
           break;
         case 'sleep':
-          achievementText = `😴 ${goalValue}hrs slept and stored onchain 😴\n` +
+          achievementText = `😴 ${currentValue}hrs slept and stored onchain 😴\n` +
             `Slept ${currentValue} hours, beat my ${goalValue} target.\n` +
             `Rested, recharged, and now… attested.\n` +
             `Proof of sleep on @base 🛌🧬\n` +
@@ -429,7 +429,7 @@ export default function DashboardInicial() {
           break;
       }
       
-      // Ensure the attestationUID is properly formatted for the URL
+      // nos aseguramos que el uid esté en minusculas
       const formattedUID = attestationUID.toLowerCase();
       const url = `https://base.easscan.org/attestation/view/${formattedUID}`;
       console.log('Sharing attestation with URL:', url);
