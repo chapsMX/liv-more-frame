@@ -20,8 +20,8 @@ function ConnectDeviceContent() {
     }
 
     // Verificar si estamos en una redirección de Rook
-    const isRookCallback = pathname.includes('client_uuid') || 
-                         (searchParams.get('provider') && searchParams.get('userId'));
+    const isRookCallback = pathname?.includes('client_uuid') || 
+                         (searchParams?.get('provider') && searchParams?.get('userId'));
 
     if (isRookCallback) {
       console.log('🔄 Detectada redirección de Rook - Procesando callback');

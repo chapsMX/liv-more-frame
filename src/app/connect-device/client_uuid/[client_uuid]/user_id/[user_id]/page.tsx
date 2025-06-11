@@ -9,7 +9,8 @@ export default function RookCallbackPage() {
 
   useEffect(() => {
     // Extraer los parámetros de la URL
-    const { client_uuid, user_id } = params;
+    const client_uuid = params?.client_uuid as string;
+    const user_id = params?.user_id as string;
     
     // Redirigir a la página principal de conexión con los parámetros
     if (client_uuid && user_id) {

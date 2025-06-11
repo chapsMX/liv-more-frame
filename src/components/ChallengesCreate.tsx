@@ -462,10 +462,13 @@ function InviteFriendsModal({ onInvite, onClose, currentFid }: InviteFriendsModa
             users.map((user) => (
               <label key={user.fid} className="flex items-center gap-3 cursor-pointer">
                 {user.pfp_url && (
-                  <img 
+                  <Image 
                     src={user.pfp_url} 
                     alt={user.username || 'User'} 
-                    className="w-8 h-8 rounded-full border border-gray-700" 
+                    width={32}
+                    height={32}
+                    className="rounded-full border border-gray-700" 
+                    unoptimized
                   />
                 )}
                 <span className="text-white">{user.username || `User ${user.fid}`}</span>

@@ -25,12 +25,12 @@ export default function RookDeviceConnection() {
       if (typeof window === 'undefined') return;
       
       // Extraer parámetros de la URL
-      const provider = searchParams.get('provider');
-      const rookUserId = searchParams.get('userId');
-      const status = searchParams.get('status');
-      const fromRedirect = searchParams.get('from_redirect');
-      const clientUuid = searchParams.get('client_uuid');
-      const userId = searchParams.get('user_id');
+      const provider = searchParams?.get('provider');
+      const rookUserId = searchParams?.get('userId');
+      const status = searchParams?.get('status');
+      const fromRedirect = searchParams?.get('from_redirect');
+      const clientUuid = searchParams?.get('client_uuid');
+      const userId = searchParams?.get('user_id');
 
       console.log('📝 Parámetros de URL:', {
         provider,

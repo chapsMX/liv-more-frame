@@ -35,21 +35,23 @@ export async function GET(request: Request) {
       );
     }
 
-    // Validar que la fecha no sea futura
-    const requestDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (requestDate > today) {
-      console.log('⚠️ Fecha futura solicitada:', date);
-      return NextResponse.json({
-        steps: 0,
-        calories: 0,
-        distance_meters: 0,
-        active_seconds: 0,
-        message: 'Future date requested'
-      });
-    }
+// Obtener la fecha de hoy en UTC sin horas
+const todayUTC = new Date();
+todayUTC.setUTCHours(0, 0, 0, 0);
+
+// Obtener la fecha solicitada como UTC también
+const requestedUTC = new Date(`${date}T00:00:00Z`);
+
+if (requestedUTC.getTime() > todayUTC.getTime()) {
+  console.log('⚠️ Fecha futura solicitada (UTC):', date);
+  return NextResponse.json({
+    steps: 0,
+    calories: 0,
+    distance_meters: 0,
+    active_seconds: 0,
+    message: 'Future date requested'
+  });
+}
 
     console.log('🔍 Obteniendo resumen físico para:', { user_id, date });
 
@@ -67,7 +69,7 @@ export async function GET(request: Request) {
       }
     );
 
-    console.log('📡 Respuesta de resumen físico:', {
+    console.log('Respuesta de resumen físico:', {
       status: summaryResponse.status,
       statusText: summaryResponse.statusText,
       headers: Object.fromEntries(summaryResponse.headers.entries())
@@ -84,7 +86,7 @@ export async function GET(request: Request) {
       }
     );
 
-    console.log('📡 Respuesta de actividad:', {
+    console.log('Respuesta de actividad fìsica:', {
       status: activityResponse.status,
       statusText: activityResponse.statusText,
       headers: Object.fromEntries(activityResponse.headers.entries())

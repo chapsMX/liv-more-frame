@@ -88,6 +88,7 @@ export async function GET(
           }}
         >
           {/* Row 1: Challenge Image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`data:image/png;base64,${Buffer.from(challengeImage).toString(
               "base64"
@@ -170,6 +171,7 @@ export async function GET(
           </div>
 
           {/* Logo */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`data:image/png;base64,${Buffer.from(logoImage).toString(
               "base64"

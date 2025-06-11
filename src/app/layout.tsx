@@ -1,20 +1,20 @@
-import clsx from 'clsx';
-import type { Metadata } from 'next';
-import { protoMono } from '../styles/fonts';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { UserProvider } from '../context/UserContext';
+import { Metadata } from 'next';
+import { protoMono } from '../styles/fonts';
+import clsx from 'clsx';
 
 export const metadata: Metadata = {
-  title: "Liv More",
-  description: "Turn Healty Habitos Into Rewards",
+  title: 'LivMore',
+  description: 'Turn healthy habits into rewards',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <UserProvider>
       <html lang="en">

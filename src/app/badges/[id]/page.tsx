@@ -29,7 +29,7 @@ type BadgeDetail = {
 export default function BadgeDetail() {
   const router = useRouter();
   const params = useParams();
-  const id = params.id;
+  const id = params?.id;
   const { userState } = useUser();
   const [badge, setBadge] = useState<BadgeDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);

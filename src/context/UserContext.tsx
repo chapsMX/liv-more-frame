@@ -14,6 +14,7 @@ export interface UserState {
   connectedProvider?: string;
   pfpUrl?: string;
   can_create?: boolean;
+  timezone?: string;
 }
 
 interface UserContextType {
@@ -31,6 +32,7 @@ const initialState: UserState = {
   canUse: false,
   connectedProvider: undefined,
   can_create: false,
+  timezone: undefined,
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);

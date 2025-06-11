@@ -168,6 +168,7 @@ function InviteFriendsModal({ onInvite, onClose, currentFid }: InviteFriendsModa
 export default function ChallengeDetail() {
   const router = useRouter();
   const params = useParams();
+  const challengeId = params?.id as string;
   const { userState } = useUser();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,7 +183,7 @@ export default function ChallengeDetail() {
     const fetchChallenge = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/challenges/${params.id}`);
+        const res = await fetch(`/api/challenges/${challengeId}`);
         const data = await res.json();
         if (res.ok) {
           setChallenge(data.challenge);
@@ -193,9 +194,34 @@ export default function ChallengeDetail() {
             const userData = await userRes.json();
             setParticipants(userData.users || []);
             // Check if current user is already joined
-            setAlreadyJoined(
-              data.challenge.participants.map(String).includes(String(userState.userFid))
-            );
+            const isJoined = data.challenge.participants.map(String).includes(String(userState.userFid));
+            setAlreadyJoined(isJoined);
+
+            // If user is joined, trigger sync of activity data
+            if (isJoined && userState.userFid) {
+              const startDate = new Date(data.challenge.start_date);
+              const endDate = new Date();
+              endDate.setDate(startDate.getDate() + data.challenge.duration_days - 1);
+
+              try {
+                const syncRes = await fetch('/api/challenges/sync-history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    user_fid: userState.userFid,
+                    challenge_id: challengeId,
+                    start_date: startDate.toISOString().split('T')[0],
+                    end_date: endDate.toISOString().split('T')[0]
+                  })
+                });
+                
+                if (!syncRes.ok) {
+                  console.error('Error syncing challenge history:', await syncRes.text());
+                }
+              } catch (syncError) {
+                console.error('Error triggering sync:', syncError);
+              }
+            }
           } else {
             setParticipants([]);
             setAlreadyJoined(false);
@@ -209,8 +235,8 @@ export default function ChallengeDetail() {
         setLoading(false);
       }
     };
-    if (params.id) fetchChallenge();
-  }, [params.id, userState.userFid]);
+    if (challengeId) fetchChallenge();
+  }, [challengeId, userState.userFid]);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -230,7 +256,7 @@ export default function ChallengeDetail() {
       const res = await fetch('/api/challenges/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challenge_id: params.id, user_fid: userState.userFid }),
+        body: JSON.stringify({ challenge_id: challengeId, user_fid: userState.userFid }),
       });
       const data = await res.json();
       if (res.ok) {
