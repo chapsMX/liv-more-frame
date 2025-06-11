@@ -7,7 +7,7 @@ import { useUser } from '../context/UserContext';
 import { useRouter } from 'next/navigation';
 import { ControlPanel } from './ControlPanel';
 import DGModal from './DGModal';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/frame-sdk";
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg';
 import { EAS } from "@ethereum-attestation-service/eas-sdk";
 import { BrowserProvider } from "ethers";
@@ -430,9 +430,10 @@ export default function DashboardInicial() {
       }
       
       const url = `https://base.easscan.org/attestation/view/${receipt}`;
-      await sdk.actions.openUrl(
-        `https://warpcast.com/~/compose?text=${encodeURIComponent(achievementText)}&embeds[]=${encodeURIComponent(url)}&embeds[]=${encodeURIComponent(image_url)}`
-      );
+      await sdk.actions.composeCast({
+        text: achievementText,
+        embeds: [url, image_url]
+      });
     } catch (error) {
       console.error('Error sharing achievement:', error);
     }
@@ -451,9 +452,10 @@ export default function DashboardInicial() {
       
       const url = `${process.env.NEXT_PUBLIC_URL}/di-daily/${shareID}`;
       
-      await sdk.actions.openUrl(
-        `https://warpcast.com/~/compose?text=${encodeURIComponent(achievementText)}&embeds[]=${encodeURIComponent(url)}`
-      );
+      await sdk.actions.composeCast({
+        text: achievementText,
+        embeds: [url]
+      });
     } catch (error) {
       console.error('Error sharing achievement:', error);
     }
