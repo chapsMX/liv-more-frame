@@ -141,18 +141,18 @@ export default function Attestations() {
 
         {/* Main Content */}
         <div className="flex flex-col items-center justify-center space-y-6 p-2">
-          <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
-            Attestations
+          <h1 className={`text-2xl font-bold text-white mb-2 ${protoMono.className}`}>
+            Your Attestations
           </h1>
 
-          <div className="w-full max-w-4xl bg-gray-900 border-2 border-gray-700 rounded-xl p-6">
+          <div className="w-full max-w-4xl bg-gray-900 border-2 border-gray-700 rounded-xl p-2">
             <div className="mb-4">
               <label htmlFor="metric-type-filter" className="block text-gray-400 text-sm font-bold mb-2">
                 Filter by Metric Type:
               </label>
               <select
                 id="metric-type-filter"
-                className="block w-full bg-gray-800 border border-gray-600 text-white py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="block w-full bg-gray-800 border border-gray-600 text-white text-2xs py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={selectedMetricType}
                 onChange={(e) => setSelectedMetricType(e.target.value)}
               >
@@ -174,23 +174,23 @@ export default function Attestations() {
                 {attestations.map((attestation) => (
                   <div
                     key={attestation.id}
-                    className="bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition-colors"
+                    className="bg-gray-800 border border-gray-700 rounded-lg p-2 cursor-pointer hover:border-blue-500 transition-colors"
                     onClick={() => handleAttestationClick(attestation)}
                   >
-                    <h2 className="text-xl font-bold">{attestation.title || attestation.name}</h2>
-                    <p className="text-gray-400 text-sm">Type: {attestation.metric_type}</p>
-                    <p className="text-gray-400 text-sm">Goal: {attestation.goal_value}, Actual: {attestation.actual_value}</p>
-                    <p className="text-gray-400 text-sm">Attested on: {new Date(attestation.created_at).toLocaleDateString()}</p>
-                    {attestation.image_url && (
+                    <p className="text-white text-2xs">Metric: {attestation.metric_type}</p>
+                    <p className="text-gray-400 text-xs">Goal: {attestation.goal_value}, Achieved: {attestation.actual_value}</p>
+                    <p className="text-gray-400 text-xs">Attested on: {new Date(attestation.created_at).toLocaleDateString()}</p>                 
+ {/*                <p className="text-gray-400 text-sm">EAS Scanner: {attestation.attestation_uid}</p>
+                     {attestation.image_url && (
                         <Image
                             src={attestation.image_url}
                             alt={attestation.title || attestation.name}
-                            width={100}
-                            height={100}
+                            width={50}
+                            height={50}
                             className="mt-2 rounded-md"
                             unoptimized
                         />
-                    )}
+                    )} */}
                   </div>
                 ))}
               </div>
