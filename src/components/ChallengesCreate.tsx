@@ -130,7 +130,10 @@ export default function ChallengesCreate() {
     try {
       const text = `I just created a new challenge: "${form.title}"! Join me and let's achieve our goals together! 🎯\n\n${mentions.join(' ')}`;
       const url = `${process.env.NEXT_PUBLIC_BASE_URL}/challenges/${createdChallenge.challenge_id}`;
-      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+      await sdk.actions.composeCast({
+        text: text,
+        embeds: [url]
+      });
     } catch (error) {
       console.error('Error sharing challenge:', error);
     }

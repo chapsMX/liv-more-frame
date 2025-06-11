@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import sdk, {
-AddFrame,
+AddMiniApp,
 type Context,
 } from "@farcaster/frame-sdk";
 import { useRouter } from 'next/navigation';
@@ -128,9 +128,9 @@ export default function LivMore() {
         setWhitelistInfo(`Error adding to whitelist: ${whitelistData.error}`);
       }
     } catch (error) {
-      if (error instanceof AddFrame.RejectedByUser) {
+      if (error instanceof AddMiniApp.RejectedByUser) {
         setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
-      } else if (error instanceof AddFrame.InvalidDomainManifest) {
+      } else if (error instanceof AddMiniApp.InvalidDomainManifest) {
         setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
       } else {
         setWhitelistInfo(`Error: ${error}`);
@@ -204,7 +204,10 @@ export default function LivMore() {
       const text = "I joined the waitlist for @livmore 🧬 🧬";
       const url = "https://app.livmore.life";
       
-      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+      await sdk.actions.composeCast({
+        text: text,
+        embeds: [url]
+      });
     } catch (error) {
       console.error('Error sharing frame:', error);
     }

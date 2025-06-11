@@ -288,7 +288,10 @@ export default function ChallengeDetail() {
         text = `Check out this challenge: "${challenge.title}"! Join me and let's achieve our goals together! ${mentions.join(' ')}`;
       }
       const url = `${process.env.NEXT_PUBLIC_URL}/di-challenge/${challenge.id}`;
-      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+      await sdk.actions.composeCast({
+        text: text,
+        embeds: [url]
+      });
     } catch (error) {
       console.error('Error sharing challenge:', error);
     }

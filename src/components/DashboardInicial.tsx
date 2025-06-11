@@ -395,7 +395,7 @@ export default function DashboardInicial() {
   }
 
   // funcion compartir atestaciones
-  const attestationShare = async (metricType: 'steps' | 'calories' | 'sleep', receipt: string) => {
+  const attestationShare = async (metricType: 'steps' | 'calories' | 'sleep', attestationUID: string) => {
     try {
       let achievementText = '';
       const currentValue = dailyMetrics[metricType];
@@ -429,7 +429,11 @@ export default function DashboardInicial() {
           break;
       }
       
-      const url = `https://base.easscan.org/attestation/view/${receipt}`;
+      // Ensure the attestationUID is properly formatted for the URL
+      const formattedUID = attestationUID.toLowerCase();
+      const url = `https://base.easscan.org/attestation/view/${formattedUID}`;
+      console.log('Sharing attestation with URL:', url);
+      
       await sdk.actions.composeCast({
         text: achievementText,
         embeds: [url, image_url]
