@@ -412,20 +412,20 @@ export default function DashboardInicial() {
             `Walked ${currentValue} steps today, my goal was ${goalValue}.\n` +
             `One foot in front of the other, and now it's onchain.\n` +
             `Attested on @base. Let's keep moving 💪🧬\n` +
-            `@LivMore`;
+            `@livmore`;
           break;
         case 'calories':
           achievementText = `🔥 ${currentValue} calories burned & stored onchain! 🔥\n` +
             `Burned ${currentValue} kcal out of my ${goalValue} kcal goal.\n` +
             `Pushed through and now my effort is stored forever, attested on @base 🧬 💪\n` +
-            `@LivMore`;
+            `@livmore`;
           break;
         case 'sleep':
           achievementText = `😴 ${currentValue}hrs slept and stored onchain 😴\n` +
             `Slept ${currentValue} hours, beat my ${goalValue} target.\n` +
             `Rested, recharged, and now… attested.\n` +
             `Proof of sleep on @base 🛌🧬\n` +
-            `@LivMore`;
+            `@livmore`;
           break;
       }
       
