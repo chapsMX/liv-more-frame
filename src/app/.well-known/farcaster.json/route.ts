@@ -27,7 +27,19 @@ export async function GET() {
       ogDescription: "Gamifying wellness by integrating wearables, blockchain attestations and social challenges.",
       ogImageUrl: `${appUrl}/hero.png`,
       screenshotUrls: [`${appUrl}/lm_01.jpg`, `${appUrl}/lm_02.jpg`, `${appUrl}/lm_04.jpg`],
-      
+      requiredChains: [
+        "eip155:8453" // Base Mainnet
+      ],
+      requiredCapabilities: [
+        "wallet.getEthereumProvider", // Para interactuar con wallets de Ethereum
+        "actions.signIn", // Para autenticación de usuarios
+        "actions.composeCast", // Para compartir atestaciones y logros
+        "actions.viewProfile", // Para ver perfiles de usuarios
+        "actions.viewCast", // Para ver casts relacionados
+        "actions.ready", // Para inicialización del SDK
+        "actions.openUrl", // Para abrir URLs externas
+        "actions.close" // Para cerrar el mini app
+      ]
     },
   };
 
