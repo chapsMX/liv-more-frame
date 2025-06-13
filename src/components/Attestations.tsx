@@ -90,9 +90,8 @@ export default function Attestations() {
   }, [userState.userFid, selectedMetricType]);
 
   const handleAttestationClick = (attestation: Attestation) => {
-    // TODO: Implement navigation to a detail page or open a modal
-    console.log('Attestation clicked:', attestation);
-    // Example: router.push(`/attestations/${attestation.id}`);
+    // Navegar a la página de detalle de la atestación
+    router.push(`/attestations/${attestation.id}`);
   };
 
   const uniqueMetricTypes = Array.from(new Set(attestations.map(att => att.metric_type)));
