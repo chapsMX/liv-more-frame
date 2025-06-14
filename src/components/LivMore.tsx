@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from "react";
 import sdk, {
-AddFrame,
+AddMiniApp,
 type Context,
 } from "@farcaster/frame-sdk";
+import { useRouter } from 'next/navigation';
 
 import { Boton } from "../styles/ui/boton";
 import { protoMono } from '../styles/fonts';
 import Image from 'next/image';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
 import '../styles/footer.css';
+import { useUser } from '../context/UserContext';
+import { TOSModal } from './TOSModal';
 
 export default function LivMore() {
+  const router = useRouter();
+  const { userState, setUserState } = useUser();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [context, setContext] = useState<Context.FrameContext>();
   const [added, setAdded] = useState(false);
@@ -21,7 +26,6 @@ export default function LivMore() {
   const [isWhitelisted, setIsWhitelisted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showPopup, setShowPopup] = useState(false);
-  const [showJustFrameItPopup, setShowJustFrameItPopup] = useState(true);
   const [countdown, setCountdown] = useState(10);
 
   const checkWhitelistStatus = async (fid: number) => {
@@ -29,6 +33,19 @@ export default function LivMore() {
       setIsLoading(true);
       const response = await fetch(`/api/whitelist/check?fid=${fid}`);
       const data = await response.json();
+      
+      setUserState({
+        isWhitelisted: data.isWhitelisted,
+        acceptedTos: data.acceptedTos,
+        acceptedPrivacyPolicy: data.acceptedPrivacyPolicy,
+        canUse: data.canUse,
+        username: data.username,
+        displayName: data.displayName,
+        userFid: fid,
+        ethAddress: data.ethAddress
+      });
+
+      // Mantener la compatibilidad con el estado local existente
       setIsWhitelisted(data.isWhitelisted);
     } catch (error) {
       console.error('Error checking whitelist status:', error);
@@ -72,6 +89,9 @@ export default function LivMore() {
       const whitelistData = await whitelistResponse.json();
 
       if (whitelistData.success) {
+        // Actualizar el estado del usuario después de agregarlo exitosamente
+        await checkWhitelistStatus(context.user.fid);
+        
         setWhitelistInfo(
           `✨ ¡Welcome ${username}!\n` +
           `🎉 You have been added to the whitelist.\n` +
@@ -108,9 +128,9 @@ export default function LivMore() {
         setWhitelistInfo(`Error adding to whitelist: ${whitelistData.error}`);
       }
     } catch (error) {
-      if (error instanceof AddFrame.RejectedByUser) {
+      if (error instanceof AddMiniApp.RejectedByUser) {
         setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
-      } else if (error instanceof AddFrame.InvalidDomainManifest) {
+      } else if (error instanceof AddMiniApp.InvalidDomainManifest) {
         setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
       } else {
         setWhitelistInfo(`Error: ${error}`);
@@ -154,18 +174,50 @@ export default function LivMore() {
         sdk.removeAllListeners();
       };
     }
-  }, [isSDKLoaded]);
+  }, [isSDKLoaded, checkWhitelistStatus]);
+
+  useEffect(() => {
+    // Redirigir al dashboard si el usuario cumple con todos los requisitos
+    console.log('🔍 Verificando estado del usuario:', {
+      isWhitelisted: userState.isWhitelisted,
+      acceptedTos: userState.acceptedTos,
+      acceptedPrivacyPolicy: userState.acceptedPrivacyPolicy,
+      canUse: userState.canUse,
+      username: userState.username
+    });
+
+    if (userState.isWhitelisted && userState.acceptedTos && userState.acceptedPrivacyPolicy && userState.canUse) {
+      console.log('✅ Usuario cumple todos los requisitos, redirigiendo a dashboard...');
+      router.push('/dashboard');
+    } else {
+      console.log('❌ Usuario no cumple todos los requisitos:', {
+        faltaWhitelist: !userState.isWhitelisted ? 'No está en whitelist' : null,
+        faltaTos: !userState.acceptedTos ? 'No ha aceptado TOS' : null,
+        faltaPP: !userState.acceptedPrivacyPolicy ? 'No ha aceptado Privacy Policy' : null,
+        faltaCanUse: !userState.canUse ? 'No tiene permiso de uso' : null
+      });
+    }
+  }, [userState, router]);
 
   const handleShare = async () => {
     try {
       const text = "I joined the waitlist for @livmore 🧬 🧬";
       const url = "https://app.livmore.life";
       
-      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`);
+      await sdk.actions.composeCast({
+        text: text,
+        embeds: [url]
+      });
     } catch (error) {
       console.error('Error sharing frame:', error);
     }
   };
+
+  const shouldShowTOSModal = userState.isWhitelisted && (!userState.acceptedTos || !userState.acceptedPrivacyPolicy);
+
+  if (shouldShowTOSModal) {
+    return <TOSModal username={context?.user?.username} />;
+  }
 
   if (!isSDKLoaded || isLoading) {
     return (
@@ -241,7 +293,7 @@ export default function LivMore() {
                   <h1 className="text-4xl font-bold">Liv More</h1>
                 </div>
                 {/* <p className="text-lg leading-relaxed mt-3 text-gray-300"> Maintaining a healthy lifestyle is tough. Even with fitness trackers and health data, people struggle with motivation, consistency, and accountability.</p> */}
-                <p className="text-lg leading-relaxed mt-3 text-gray-300">Gamifying wellness by integrating wearable devices, blockchain attestations, and social challenges.</p>
+                <p className="text-lg leading-relaxed mt-3 text-gray-300">Gamifying wellness by integrating wearables, blockchain attestations and social challenges.</p>
                 
                 <div className="grid grid-cols-3 gap-8 mt-8">
                   {/* Calories */}
@@ -324,7 +376,7 @@ export default function LivMore() {
       <footer className="w-full overflow-hidden py-2 mb-4">
         <div className="relative flex flex-col gap-0.5">
           <p className="text-center text-gray-400 text-sm">
-            made with <span className="text-red-500 text-lg">❤</span> during ETH Denver
+            built with <span className="text-red-500 text-lg">❤</span> during ETH Denver
           </p>
         </div>
       </footer>
@@ -357,46 +409,8 @@ export default function LivMore() {
         </div>
       )}
 
-      {/* Just Frame It Popup */}
-      {showJustFrameItPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-4 max-w-4xl w-full mx-4 relative">
-            {/* Botón de cerrar */}
-            <button 
-              onClick={() => setShowJustFrameItPopup(false)}
-              className="absolute -top-4 -right-2 text-gray-400 hover:text-white transition-colors bg-gray-900 rounded-full p-1 border-2 border-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
 
-            <div className="flex flex-col items-center gap-6">
-              <div className="w-full h-64 relative">
-                <Image
-                  src="/frameIt.png"
-                  alt="Just Frame It"
-                  fill
-                  className="object-contain rounded-lg"
-                />
-              </div>
-              
-              <div className={`text-center ${protoMono.className} space-y-4`}>
-                <p className="text-gray-300 leading-relaxed text-sm">
-                  We have been selected to participate in the Just Frame It program, a two-month builder program designed to empower developers, product creators, and founders to build Frames on Farcaster.
-                </p>
-              </div>
 
-              <Boton
-                onClick={handleShare}
-                className="mt-4 border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 px-6 rounded"
-              >
-                <span className={`text-base font-semibold ${protoMono.className}`}>Share Frame</span>
-              </Boton>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -5,9 +5,9 @@ const appUrl = process.env.NEXT_PUBLIC_URL;
 
 const frame = {
   version: "next",
-  imageUrl: `${appUrl}/frameImage.jpg`,
+  imageUrl: `${appUrl}/frameImage.png`,
   button: {   
-    title: "Join Liv More Whitelist",
+    title: "Join Liv More Beta Test",
     action: {
       type: "launch_frame",
       name: "Liv More",

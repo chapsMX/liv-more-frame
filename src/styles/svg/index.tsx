@@ -1,5 +1,6 @@
 interface IconProps {
     className?: string;
+    style?: React.CSSProperties;
   }
   
   export const ShareIcon = ({ className = "w-5 h-5" }: IconProps) => (
@@ -37,22 +38,22 @@ interface IconProps {
     </svg>
   );
   
-  export const CaloriesIcon = ({ className = "w-6 h-6" }: IconProps) => (
-    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" className={className}>
+  export const CaloriesIcon = ({ className = "w-6 h-6", style }: IconProps) => (
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" className={className} style={style}>
       <g>
         <path fill="currentColor" d="M7,15.74H7a.71.71,0,0,1-.68-.53L4.27,6.87l-.59,2.3A.71.71,0,0,1,3,9.7H0V8.3H2.46L3.61,3.83A.74.74,0,0,1,4.3,3.3.69.69,0,0,1,5,3.83l2,8.3L9.82.83A.71.71,0,0,1,10.48.3a.65.65,0,0,1,.69.49L13.51,8.3H16V9.7H13a.7.7,0,0,1-.67-.49L10.58,3.59,7.68,15.21A.71.71,0,0,1,7,15.74Z"></path>
       </g>
     </svg>
   );
   
-  export const SleepIcon = ({ className = "w-6 h-6" }: IconProps) => (
-    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className={className}>
+  export const SleepIcon = ({ className = "w-6 h-6", style }: IconProps) => (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className={className} style={style}>
       <path fill="currentColor" d="M28.62,17.482c0.508-0.452,1.324-0.028,1.215,0.675C28.797,24.865,22.998,30,16,30 C8.268,30,2,23.732,2,16C2,8.985,7.16,3.175,13.891,2.158c0.688-0.104,1.096,0.698,0.651,1.195C12.963,5.119,12,7.445,12,10 c0,5.523,4.477,10,10,10C24.542,20,26.858,19.047,28.62,17.482z"></path>
     </svg>
   );
   
-  export const StepsIcon = ({ className = "w-6 h-6" }: IconProps) => (
-    <svg viewBox="0 0 17 17" xmlns="http://www.w3.org/2000/svg" className={className}>
+  export const StepsIcon = ({ className = "w-6 h-6", style }: IconProps) => (
+    <svg viewBox="0 0 17 17" xmlns="http://www.w3.org/2000/svg" className={className} style={style}>
       <g transform="translate(1.000000, 0.000000)" fill="currentColor">
         <path d="M4.428,13.572 L0.629,12.142 L0.145,13.315 C0.145,13.315 -0.318,15.213 1.342,15.838 C3.004,16.465 3.961,14.751 3.961,14.751 L4.428,13.572 L4.428,13.572 Z"></path>
         <path d="M7.207,3.193 C5.565,2.534 3.26,3.979 2.463,5.8 C2.135,6.55 1.986,7.359 1.862,8.157 C1.803,8.538 1.761,8.929 1.686,9.309 C1.59,9.786 1.447,10.245 1.305,10.708 C1.108,11.351 1.325,11.459 1.924,11.569 L4.022,12.361 C4.236,12.463 4.654,12.72 4.869,12.48 C5.059,12.265 5.021,11.873 5.148,11.618 C5.312,11.287 5.496,10.95 5.699,10.638 C6.148,9.94 7,9.43 7.577,8.828 C8.292,8.08 8.687,7.33 8.905,6.338 C9.195,5.017 8.528,3.722 7.207,3.193 L7.207,3.193 Z"></path>
