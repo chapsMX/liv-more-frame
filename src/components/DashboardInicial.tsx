@@ -13,6 +13,13 @@ import { EAS } from "@ethereum-attestation-service/eas-sdk";
 import { BrowserProvider } from "ethers";
 import type { TransactionReceipt } from "ethers";
 
+// Helper para calcular fecha de finalización (comentado porque no se usa actualmente)
+// function getEndDate(startDate: string, durationDays: number) {
+//   const start = new Date(startDate);
+//   start.setDate(start.getDate() + durationDays);
+//   return start.toLocaleDateString();
+// }
+
 export default function DashboardInicial() {
   const { userState, setUserState } = useUser();
   const router = useRouter();
@@ -48,6 +55,21 @@ export default function DashboardInicial() {
   const [attestationError, setAttestationError] = useState<{ steps: string | null, calories: string | null, sleep: string | null }>({ steps: null, calories: null, sleep: null });
   const [attestationSuccess, setAttestationSuccess] = useState<{ steps: string | null, calories: string | null, sleep: string | null }>({ steps: null, calories: null, sleep: null });
   const [createdAttestations, setCreatedAttestations] = useState<{ steps: boolean, calories: boolean, sleep: boolean }>({ steps: false, calories: false, sleep: false });
+  
+  // State para challenges oficiales
+  const [officialChallenges, setOfficialChallenges] = useState<Challenge[]>([]);
+  const [loadingChallenges, setLoadingChallenges] = useState(true);
+
+  // Interface para Challenge
+  interface Challenge {
+    id: number;
+    title: string;
+    activity_type: string;
+    start_date: string;
+    image_url?: string;
+    points_value?: number;
+    is_official: boolean;
+  }
 
   // Determine the metric with an active status (error or success) to display a single message
   let metricWithActiveStatus: 'calories' | 'steps' | 'sleep' | null = null;
@@ -56,6 +78,64 @@ export default function DashboardInicial() {
       metricWithActiveStatus = metric;
     }
   });
+
+  // Función para guardar actividad diaria en la base de datos
+  const saveDailyActivity = useCallback(async (userFid: number | string, date: string, metrics: { steps: number; calories: number; sleep: number }) => {
+    try {
+      const response = await fetch('/api/users/save-daily-activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_fid: userFid,
+          date: date,
+          steps: metrics.steps,
+          calories: metrics.calories,
+          sleep_hours: metrics.sleep,
+          steps_completed: metrics.steps >= userGoals.steps_goal,
+          calories_completed: metrics.calories >= userGoals.calories_goal,
+          sleep_completed: metrics.sleep >= userGoals.sleep_hours_goal,
+          all_completed: metrics.steps >= userGoals.steps_goal && 
+                        metrics.calories >= userGoals.calories_goal && 
+                        metrics.sleep >= userGoals.sleep_hours_goal
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('❌ Error saving daily activity:', await response.text());
+      } else {
+        console.log('✅ Daily activity saved successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving daily activity:', error);
+    }
+  }, [userGoals.steps_goal, userGoals.calories_goal, userGoals.sleep_hours_goal]);
+
+  // Función para sincronizar challenges activos del usuario
+  const syncUserChallenges = useCallback(async (userFid: number | string, date: string) => {
+    try {
+      const response = await fetch('/api/challenges/sync-daily', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: date,
+          user_fid: userFid
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Challenge sync completed:', result);
+      } else {
+        console.error('❌ Error syncing challenges:', await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Error calling challenge sync:', error);
+    }
+  }, []);
 
   // const para el servicio de atestaciones de ethereum
   const EAS_CONTRACT_ADDRESS = "0x4200000000000000000000000000000000000021";
@@ -254,17 +334,21 @@ export default function DashboardInicial() {
         const sleepResponse = await fetch(`/api/users/sleep-summary?user_id=${rookUserId}&date=${today}`);
         const sleepData = await sleepResponse.json();
 
-        setDailyMetrics({
+        const newDailyMetrics = {
           steps: physicalData.steps || 0,
           calories: physicalData.calories || 0,
           sleep: sleepData.sleep_duration_hours || 0
-        });
+        };
 
-        console.log('✅ Métricas de salud actualizadas:', {
-          steps: physicalData.steps,
-          calories: physicalData.calories,
-          sleep: sleepData.sleep_duration_hours
-        });
+        setDailyMetrics(newDailyMetrics);
+
+        // Guardar los datos en daily_activities para validar rachas
+        await saveDailyActivity(userState.userFid, today, newDailyMetrics);
+
+        // Sincronizar challenges activos para el usuario
+        await syncUserChallenges(userState.userFid, today);
+
+        console.log('✅ Métricas de salud actualizadas:', newDailyMetrics);
       } catch (error) {
         console.error('❌ Error obteniendo métricas de salud:', error);
       }
@@ -273,7 +357,7 @@ export default function DashboardInicial() {
     if (initialCheckDone && userState.connectedProvider && userState.timezone) {
       fetchHealthMetrics();
     }
-  }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone]);
+  }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone, saveDailyActivity, syncUserChallenges]);
 
   useEffect(() => {
     const fetchWeeklyMetrics = async () => {
@@ -600,6 +684,26 @@ export default function DashboardInicial() {
     checkExistingAttestations();
   }, [checkExistingAttestations]);
 
+  // Fetch official challenges
+  useEffect(() => {
+    const fetchOfficialChallenges = async () => {
+      setLoadingChallenges(true);
+      try {
+        const res = await fetch('/api/challenges');
+        const data = await res.json();
+        // Filter only official challenges
+        const official = (data.challenges || []).filter((challenge: Challenge) => challenge.is_official);
+        setOfficialChallenges(official);
+      } catch (error) {
+        console.error('Error fetching official challenges:', error);
+        setOfficialChallenges([]);
+      } finally {
+        setLoadingChallenges(false);
+      }
+    };
+    fetchOfficialChallenges();
+  }, []);
+
   const createAttestation = async (metricType: 'steps' | 'calories' | 'sleep') => {
     setIsCreatingAttestation(prev => ({ ...prev, [metricType]: true }));
     setAttestationError(prev => ({ ...prev, [metricType]: null }));
@@ -888,20 +992,85 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
+              {/* Carrusel de Official Challenges */}
+              <div className="mt-6 w-full max-w-4xl">
+                <div className={`relative z-10 space-y-4 ${protoMono.className}`}>
+                  <h2 className="text-2xl font-bold text-white text-center">Official Challenges</h2>
+                  
+                  <div className="w-full overflow-x-auto pb-2">
+                    <div className="flex flex-row gap-4 snap-x snap-mandatory overflow-x-auto px-1">
+                      {loadingChallenges ? (
+                        <div className="text-gray-400 text-center py-8 w-full">Loading challenges...</div>
+                      ) : officialChallenges.length === 0 ? (
+                        <div className="text-gray-400 text-center py-8 w-full">No official challenges available yet.</div>
+                      ) : (
+                        officialChallenges.map((challenge) => (
+                          <div
+                            key={challenge.id}
+                            className="min-w-[160px] max-w-xs bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg cursor-pointer hover:border-violet-700 transition-colors snap-center"
+                            onClick={() => router.push(`/challenges/${challenge.id}`)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => { if (e.key === 'Enter') router.push(`/challenges/${challenge.id}`); }}
+                          >
+                            {challenge.image_url && (
+                              <div className="flex-shrink-0 mb-2">
+                                <Image
+                                  src={challenge.image_url}
+                                  alt={challenge.title || 'Challenge'}
+                                  width={120}
+                                  height={120}
+                                  className="rounded-lg border border-gray-700 object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 w-full flex flex-col items-center">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-bold text-white py-0 text-center m-0">{challenge.title}</span>
+                                <span className="ml-2 px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold">Official</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1 text-xs text-gray-300 mb-0 justify-left w-full">
+                                <span className="px-1 py-0">Activity: {challenge.activity_type}</span>
+                                <span className="px-1 py-0">Start: {challenge.start_date ? new Date(challenge.start_date).toLocaleDateString() : '-'}</span>
+{/*                                 {challenge.points_value && (
+                                  <span className="bg-violet-800 px-2 py-1 rounded">Points: {challenge.points_value}</span>
+                                )} */}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cuarta fila: Progreso Diario */}
+              <div className="mt-2 w-full mb-0 max-w-4xl">
+                <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
+                  <p className={`text-lg mb-0 font-bold text-white`}>
+                    Daily Progress: {calculateDailyProgress()}%
+                  </p>
+                  <p className={`text-base text-gray-300`}>
+                    {getProgressMessage()}
+                    {calculateDailyProgress() === 100 && (
+                      <span 
+                        onClick={handleShare}
+                        className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
+                      >
+                      Share to Farcaster
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
               {/* Attestation Section - Only show if at least one goal is met */}
               {(['calories', 'steps', 'sleep'] as const).some(metric => 
                 (dailyMetrics[metric] / goals[metric]) >= 1
               ) && (
                 <div className="w-full max-w-4xl space-y-4 mb-0">
-                  <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                    <p className={`text-lg mb-0 font-bold text-white`}>
-                      Congratulations, you did it!
-                    </p>
-                    <p className={`text-base text-gray-300`}>
-                      Mint an attestation to prove your achievement
-                    </p>
-                  </div>
-
                   <div className="grid grid-cols-3 gap-4">
                     {(['calories', 'steps', 'sleep'] as const).map((metric) => {
                       const isGoalMet = (dailyMetrics[metric] / goals[metric]) >= 1;
@@ -941,6 +1110,14 @@ export default function DashboardInicial() {
                       );
                     })}
                   </div>
+                  <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
+                    <p className={`text-lg mb-0 font-bold text-white`}>
+                      Congratulations, you did it!
+                    </p>
+                    <p className={`text-base text-gray-300`}>
+                      Mint an attestation to prove your achievement
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -964,26 +1141,6 @@ export default function DashboardInicial() {
                   )}
                 </div>
               )}
-
-              {/* Cuarta fila: Progreso Diario */}
-              <div className="mt-2 w-full mb-0 max-w-4xl">
-                <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                  <p className={`text-lg mb-0 font-bold text-white`}>
-                    Daily Progress: {calculateDailyProgress()}%
-                  </p>
-                  <p className={`text-base text-gray-300`}>
-                    {getProgressMessage()}
-                    {calculateDailyProgress() === 100 && (
-                      <span 
-                        onClick={handleShare}
-                        className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
-                      >
-                      Share to Farcaster
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
 
               {/* Quinta fila: Actividad Semanal */}
               <div className="mt-2 w-full max-w-4xl border-t border-gray-800 pt-2">

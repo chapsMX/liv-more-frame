@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { sdk } from '@farcaster/frame-sdk';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { EAS, SchemaEncoder, NO_EXPIRATION } from "@ethereum-attestation-service/eas-sdk";
-import { ethers } from 'ethers';
-import LoginButton from '@/components/LoginButton';
 import { isAuthorizedForTesting } from '@/utils/auth';
+import { createWalletClient, custom, encodeFunctionData, parseAbi } from 'viem';
+import { base } from 'viem/chains';
+
 // Arrow icon component
 const ArrowLeft = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
   <svg 
@@ -28,26 +27,27 @@ const ArrowLeft = ({ size = 24, className = "" }: { size?: number; className?: s
   </svg>
 );
 
-// EAS Attestation Component
+// EAS Configuration
+const EAS_CONTRACT_ADDRESS = '0x4200000000000000000000000000000000000021';
+const SCHEMA_UID = "0xd4911f8070ea52111581b19a1b4de472903651e605bed55a5ffa688de7622034";
+
+// ABI for attestByDelegation function
+const ABI = parseAbi([
+  'function attestByDelegation((bytes32 schema,address recipient,uint64 expirationTime,bool revocable,bytes32 refUID,bytes data,uint256 value),bytes signature,address attester,uint64 deadline) returns (bytes32)'
+]);
+
+// Attestation Tester Component using viem (Farcaster wallet compatible)
 function AttestationTester() {
-  const { authenticated, ready } = usePrivy();
-  const { wallets } = useWallets();
-  const activeWallet = wallets[0]; // Using first wallet as active
   const [isCreatingAttestation, setIsCreatingAttestation] = useState(false);
+  const [isWaitingForWallet, setIsWaitingForWallet] = useState(false);
   const [attestationResult, setAttestationResult] = useState<{
     success: boolean;
-    uid?: string;
     error?: string;
     txHash?: string;
   } | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // EAS Configuration
-  const EAS_CONTRACT_ADDRESS = "0x4200000000000000000000000000000000000021";
-  const SCHEMA_UID = "0xd4911f8070ea52111581b19a1b4de472903651e605bed55a5ffa688de7622034";
-  const ZERO_UID =
-    '0x0000000000000000000000000000000000000000000000000000000000000000';
-  
-  // Constant values as specified
+  // Constant values for testing
   const ATTESTATION_DATA = {
     fid: 20701,
     name: "carlos",
@@ -61,145 +61,161 @@ function AttestationTester() {
     image_url: "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreidjr3w5yzdqhafqsaynss35kiwdqa4p42fkjpnjzdnx2thkubkxxq"
   };
 
-  const createAttestation = async () => {
-    if (!authenticated || !activeWallet) {
-      setAttestationResult({
-        success: false,
-        error: "Wallet not connected"
-      });
-      return;
-    }
+  // Connect wallet using Farcaster SDK with viem
+  const connectWallet = async () => {
+    try {
+      console.log("Attempting to connect wallet using Farcaster SDK...");
+      
+      // Get Ethereum provider from Farcaster SDK
+      console.log("Getting Ethereum provider from Farcaster SDK...");
+      const provider = await sdk.wallet.getEthereumProvider();
+      console.log("Provider obtained:", !!provider);
 
+      if (!provider) {
+        throw new Error("No Ethereum provider available from Farcaster SDK");
+      }
+
+      // Create wallet client with Farcaster provider
+      const walletClient = createWalletClient({
+        chain: base,
+        transport: custom(provider)
+      });
+
+      const [address] = await walletClient.getAddresses();
+      
+      console.log("Connected account:", address);
+      setWalletAddress(address);
+      return address;
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      throw error;
+    }
+  };
+
+  const createAttestation = async () => {
     setIsCreatingAttestation(true);
     setAttestationResult(null);
 
     try {
       console.log("Starting attestation process...");
       
-      // Get the Privy wallet provider first
-      console.log("Getting Privy wallet provider...");
-      const privyProvider = await activeWallet.getEthereumProvider();
-      const provider = new ethers.BrowserProvider(privyProvider);
-      const signer = await provider.getSigner();
-      
-      // Verificar la red del signer
-      const network = await provider.getNetwork();
-      console.log("Signer network:", network);
-      
-      const BASE_CHAIN_ID = 8453;
-      if (Number(network.chainId) !== BASE_CHAIN_ID) {
-        throw new Error("Please switch to Base network to create attestations");
+      // 1. Connect wallet if not connected
+      let recipient = walletAddress;
+      if (!recipient) {
+        console.log("Wallet not connected, connecting now...");
+        recipient = await connectWallet();
+        console.log("Wallet connected, address:", recipient);
+      } else {
+        console.log("Using existing wallet address:", recipient);
       }
 
-      // Initialize EAS with provider
-      console.log("Creating EAS instance with contract:", EAS_CONTRACT_ADDRESS);
-      const eas = new EAS(EAS_CONTRACT_ADDRESS);
-      eas.connect(signer);
+      // Verify we have a valid recipient
+      if (!recipient) {
+        throw new Error("Failed to get wallet address");
+      }
 
-      // Initialize SchemaEncoder with the schema string
-      console.log("Initializing SchemaEncoder...");
-      const schemaEncoder = new SchemaEncoder(
-        "uint256 fid,string name,string display_name,address wallet,string metric_type,uint256 goal_value,uint256 actual_value,uint256 timestamp,string challenge_id,string title,string description,string image_url"
-      );
+      // 3. Prepare attestation payload
+      const attestationPayload = {
+        schema: SCHEMA_UID,
+        recipient: recipient, // User wallet that will receive the attestation
+        expirationTime: '0',
+        revocable: false,
+        // Raw data for backend encoding
+        fid: ATTESTATION_DATA.fid,
+        name: ATTESTATION_DATA.name,
+        display_name: ATTESTATION_DATA.display_name,
+        wallet: recipient,
+        metric_type: ATTESTATION_DATA.metric_type,
+        goal_value: ATTESTATION_DATA.goal_value,
+        actual_value: ATTESTATION_DATA.actual_value,
+        timestamp: Math.floor(Date.now() / 1000),
+        challenge_id: ATTESTATION_DATA.challenge_id,
+        title: ATTESTATION_DATA.title,
+        description: ATTESTATION_DATA.description,
+        image_url: ATTESTATION_DATA.image_url
+      };
 
-      const signerAddress = await signer.getAddress();
-      console.log("Signer address:", signerAddress);
+      console.log("Attestation payload:", attestationPayload);
 
-      // Encode the data
-      console.log("Encoding attestation data...");
-      const encodedData = schemaEncoder.encodeData([
-        { name: "fid", value: ATTESTATION_DATA.fid, type: "uint256" },
-        { name: "name", value: ATTESTATION_DATA.name, type: "string" },
-        { name: "display_name", value: ATTESTATION_DATA.display_name, type: "string" },
-        { name: "wallet", value: signerAddress, type: "address" },
-        { name: "metric_type", value: ATTESTATION_DATA.metric_type, type: "string" },
-        { name: "goal_value", value: ATTESTATION_DATA.goal_value, type: "uint256" },
-        { name: "actual_value", value: ATTESTATION_DATA.actual_value, type: "uint256" },
-        { name: "timestamp", value: Math.floor(Date.now() / 1000), type: "uint256" },
-        { name: "challenge_id", value: ATTESTATION_DATA.challenge_id, type: "string" },
-        { name: "title", value: ATTESTATION_DATA.title, type: "string" },
-        { name: "description", value: ATTESTATION_DATA.description, type: "string" },
-        { name: "image_url", value: ATTESTATION_DATA.image_url, type: "string" }
-      ]);
-
-      // Get the signature from backend
-      console.log("Getting signature from backend...");
+      // 4. Get delegated signature from backend
+      console.log("Getting delegated signature from backend...");
       const signResponse = await fetch('/api/attestations/delegated-sign-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          schema: SCHEMA_UID,
-          recipient: signerAddress,
-          expirationTime: '0',
-          revocable: false,
-          data: encodedData,
-          attesterAddress: signerAddress,
-        }),
+        body: JSON.stringify(attestationPayload),
       });
 
       if (!signResponse.ok) {
-        const errorText = await signResponse.text();
-        console.error("Backend signature error:", errorText);
-        throw new Error(`Failed to get signature: ${signResponse.statusText}. ${errorText}`);
+        const errorData = await signResponse.json();
+        throw new Error(errorData.error || 'Failed to get delegated signature');
       }
 
-      const { signature, attester } = await signResponse.json();
-      
-      console.log("Got signature from backend:", {
-        signature,
-        attester,
-        signerAddress
-      });
+      const signResult = await signResponse.json();
+      console.log("Backend response:", signResult);
 
-      // Validar que el attester sea el correcto
-      if (attester.toLowerCase() !== "0xf1D37083cbdf0a5a0735D666e2634e7BBBADe38f".toLowerCase()) {
-        throw new Error("Invalid attester address from backend");
-      }
+       // 5. Create attestation using viem (based on submitDelegatedAttestation pattern)
+       console.log("Creating attestation with viem...");
+       
+       // Get Farcaster provider
+       const provider = await sdk.wallet.getEthereumProvider();
+       if (!provider) {
+         throw new Error("No Ethereum provider available from Farcaster SDK");
+       }
 
-      // Create the attestation
-      console.log("Creating attestation with data:", {
-        schema: SCHEMA_UID,
-        recipient: signerAddress,
-        attester: attester,
-        hasSignature: !!signature
-      });
-      
-      const tx = await eas.attestByDelegation({
-        schema: SCHEMA_UID,
-        data: {
-          recipient: signerAddress,
-          expirationTime: NO_EXPIRATION,
-          revocable: false,
-          refUID: ZERO_UID,
-          data: encodedData,
-          value: BigInt(0),
-        },
-        signature,
-        attester,
-        deadline: NO_EXPIRATION
-      });
+       // Create wallet client with Farcaster provider
+       const walletClient = createWalletClient({
+         chain: base,
+         transport: custom(provider)
+       });
 
-      console.log("Transaction sent:", {
-        data: tx.data,
-        from: await signer.getAddress(),
-        to: EAS_CONTRACT_ADDRESS
-      });
-      
-      // Wait for transaction confirmation
-      console.log("Waiting for transaction confirmation...");
-      const newAttestationUID = await tx.wait();
-      
-      console.log("New attestation UID:", newAttestationUID);
-      console.log("Transaction receipt:", tx.receipt);
+       const [account] = await walletClient.getAddresses();
+       console.log("Using account:", account);
 
-      setAttestationResult({
-        success: true,
-        uid: newAttestationUID,
-        txHash: tx.receipt?.hash
-      });
+       // 6. Encode data for 'attestByDelegation' call
+       console.log("Encoding function data...");
+       const data = encodeFunctionData({
+         abi: ABI,
+         functionName: 'attestByDelegation',
+         args: [
+           {
+             schema: signResult.delegatedAttestation.schema,
+             recipient: signResult.delegatedAttestation.recipient,
+             expirationTime: BigInt(signResult.delegatedAttestation.expirationTime),
+             revocable: signResult.delegatedAttestation.revocable,
+             refUID: signResult.delegatedAttestation.refUID,
+             data: signResult.delegatedAttestation.data || signResult.encodedData,
+             value: BigInt(signResult.delegatedAttestation.value),
+           },
+           signResult.signature,
+           signResult.attester, // Backend signer who signed the attestation
+           BigInt(signResult.deadline || 0)
+         ]
+       });
+
+       console.log("Function data encoded successfully");
+
+       // 7. Send transaction from user's wallet
+       console.log("Sending transaction...");
+       setIsWaitingForWallet(true);
+       
+       const txHash = await walletClient.sendTransaction({
+         account,
+         to: EAS_CONTRACT_ADDRESS,
+         data,
+         value: BigInt(0)
+       });
+
+       console.log("Transaction sent successfully:", txHash);
+       setIsWaitingForWallet(false);
+
+       setAttestationResult({
+         success: true,
+         txHash: txHash
+       });
 
     } catch (error) {
       console.error("Error creating attestation:", error);
+      setIsWaitingForWallet(false);
       setAttestationResult({
         success: false,
         error: error instanceof Error ? error.message : "Unknown error occurred"
@@ -209,46 +225,43 @@ function AttestationTester() {
     }
   };
 
-  if (!ready) {
-    return (
-      <div className="bg-white rounded-lg p-1 border border-gray-200">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Privy...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <div className="bg-white rounded-lg p-1 border border-gray-200">
-        <div className="text-center">
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">EAS Attestations</h4>
-          <p className="text-gray-600 text-sm">
-            Please connect your wallet first to create attestations
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg p-1 border border-gray-200">
-      <div className="space-y-2">
+    <div className="bg-white rounded-lg p-4 border border-gray-200">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-lg font-semibold text-gray-900">EAS Attestations</h4>
+          <h4 className="text-lg font-semibold text-gray-900">EAS Attestations (viem)</h4>
           <div className="text-xs text-gray-500">Base Network</div>
         </div>
 
+        {/* Wallet Connection Status */}
+        <div className="bg-gray-50 rounded-lg p-3">
+          <h5 className="font-medium text-gray-900 mb-2">Wallet Status</h5>
+          {walletAddress ? (
+            <div className="text-sm text-green-700">
+              ✅ Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">
+                🔌 Not connected
+              </div>
+              <button
+                onClick={connectWallet}
+                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+              >
+                Connect Wallet
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Attestation Data Preview */}
-        <div className="bg-gray-50 rounded-lg p-2">
+        <div className="bg-gray-50 rounded-lg p-3">
           <h5 className="font-medium text-gray-900 mb-2">Attestation Data Preview</h5>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div><span className="text-gray-600">FID:</span> {ATTESTATION_DATA.fid}</div>
             <div><span className="text-gray-600">Name:</span> {ATTESTATION_DATA.name}</div>
             <div><span className="text-gray-600">Display Name:</span> {ATTESTATION_DATA.display_name}</div>
-            <div><span className="text-gray-600">Wallet:</span> {activeWallet?.address.slice(0, 6)}...{activeWallet?.address.slice(-4)}</div>
             <div><span className="text-gray-600">Metric:</span> {ATTESTATION_DATA.metric_type}</div>
             <div><span className="text-gray-600">Goal:</span> {ATTESTATION_DATA.goal_value.toLocaleString()}</div>
             <div><span className="text-gray-600">Achieved:</span> {ATTESTATION_DATA.actual_value.toLocaleString()}</div>
@@ -260,13 +273,39 @@ function AttestationTester() {
           </div>
         </div>
 
+        {/* Process Explanation */}
+        <div className="bg-blue-50 rounded-lg p-3">
+          <h5 className="font-medium text-blue-900 mb-2">Process Flow</h5>
+          <ol className="text-sm text-blue-800 space-y-1">
+            <li>1. 🔐 Backend signs attestation data delegated</li>
+            <li>2. 🌐 Connect to Farcaster Wallet</li>
+            <li>3. 📝 Encode attestByDelegation with viem</li>
+            <li>4. 📤 Send transaction via Farcaster Wallet</li>
+          </ol>
+        </div>
+
+        {/* Wallet Warning */}
+        <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+          <h5 className="font-medium text-yellow-900 mb-2">⚠️ Wallet Notice</h5>
+          <div className="text-sm text-yellow-800 space-y-1">
+            <p><strong>Coinbase Wallet may show:</strong> "Transaction preview unavailable"</p>
+            <p><strong>This is normal</strong> for EAS attestation transactions.</p>
+            <p><strong>Safe to proceed:</strong> The transaction is properly formed and secure.</p>
+          </div>
+        </div>
+
         {/* Create Attestation Button */}
         <button
           onClick={createAttestation}
-          disabled={isCreatingAttestation}
+          disabled={isCreatingAttestation || isWaitingForWallet}
           className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
         >
-          {isCreatingAttestation ? (
+          {isWaitingForWallet ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Waiting for Wallet Confirmation...
+            </>
+          ) : isCreatingAttestation ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               Creating Attestation...
@@ -274,7 +313,7 @@ function AttestationTester() {
           ) : (
             <>
               <span>🏆</span>
-              Create EAS Attestation
+              Create EAS Attestation (viem)
             </>
           )}
         </button>
@@ -289,27 +328,20 @@ function AttestationTester() {
             {attestationResult.success ? (
               <div className="space-y-2">
                 <p className="text-sm text-green-800 font-medium">
-                  ✅ Attestation created successfully!
+                  ✅ Attestation transaction sent successfully!
                 </p>
-                {attestationResult.uid && (
-                  <div className="text-xs text-green-700">
-                    <div><strong>UID:</strong> {attestationResult.uid}</div>
-                  </div>
-                )}
                 {attestationResult.txHash && (
                   <div className="text-xs text-green-700">
                     <div><strong>TX Hash:</strong> {attestationResult.txHash}</div>
+                    <a
+                      href={`https://basescan.org/tx/${attestationResult.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors"
+                    >
+                      View on BaseScan →
+                    </a>
                   </div>
-                )}
-                {attestationResult.uid && (
-                  <a
-                    href={`https://base.easscan.org/attestation/view/${attestationResult.uid}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-2 text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors"
-                  >
-                    View on EAS Scan →
-                  </a>
                 )}
               </div>
             ) : (
@@ -448,19 +480,16 @@ export default function AtestPage() {
             </h2>
             <p className="text-gray-600 max-w-md mx-auto">
               Bienvenido a la página de pruebas de LivMore. Aquí puedes realizar 
-              experimentos y pruebas de funcionalidades.
+              experimentos y pruebas de funcionalidades usando EAS SDK con Farcaster Wallet.
             </p>
           </div>
 
           {/* Test Area */}
-          <div className="bg-gray-50 rounded-xl p-2 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Área de Pruebas - Privy Integration
+          <div className="bg-gray-50 rounded-xl p-4 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Área de Pruebas - viem + Farcaster Wallet
             </h3>
-            <div className="grid gap-4">
-              <LoginButton />
-              <AttestationTester />
-            </div>
+            <AttestationTester />
           </div>
 
           {/* Info Card */}
@@ -477,6 +506,7 @@ export default function AtestPage() {
                   <li>• Usuario autorizado: FID {userFid}</li>
                   <li>• Contexto: Farcaster Mini App</li>
                   <li>• Estado: Conectado y verificado</li>
+                  <li>• Wallet: Farcaster Wallet (viem)</li>
                 </ul>
               </div>
             </div>

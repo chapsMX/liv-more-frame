@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { protoMono } from '../styles/fonts';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
 import { MIN_GOALS, validateGoals } from '@/constants/goals';
+import { sdk } from "@farcaster/frame-sdk";
+import { useUser } from '../context/UserContext';
 
 interface GoalsModalProps {
   onSave: (goals: { calories: number; steps: number; sleep: number }) => void;
@@ -11,26 +13,62 @@ interface GoalsModalProps {
 }
 
 export default function DGModal({ onSave, initialGoals }: GoalsModalProps) {
+  const { userState } = useUser();
   const [calories, setCalories] = useState(initialGoals?.calories || MIN_GOALS.CALORIES);
   const [steps, setSteps] = useState(initialGoals?.steps || MIN_GOALS.STEPS);
   const [sleep, setSleep] = useState(initialGoals?.sleep || MIN_GOALS.SLEEP);
   const [validation, setValidation] = useState(validateGoals({ calories, steps, sleep }));
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const newValidation = validateGoals({ calories, steps, sleep });
     setValidation(newValidation);
   }, [calories, steps, sleep]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const shareGoals = async () => {
+    try {
+      setIsSharing(true);
+      
+      // Crear ID único para la imagen
+      const time = Math.floor(Date.now() / 1000);
+      const shareID = `${userState.userFid}-${time}`;
+      
+      // Texto del cast
+      const shareText = `🎯 I just set my daily goals on @livmore!\n\n` +
+
+        `💪 I'm ready to crush these goals! Who's joining me? 🚀`;
+      
+      // URL de la imagen dinámica
+      const frameUrl = `${process.env.NEXT_PUBLIC_URL}/di-goals/${shareID}`;
+      
+      // Compartir usando SDK de Farcaster
+      await sdk.actions.composeCast({
+        text: shareText,
+        embeds: [frameUrl]
+      });
+      
+    } catch (error) {
+      console.error('Error sharing goals:', error);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validation.isValid) {
       return;
     }
+    
+    // Primero guardar los objetivos
     onSave({
       calories,
       steps,
       sleep
     });
+    
+    // Luego compartir automáticamente
+    await shareGoals();
   };
 
   return (
@@ -96,10 +134,17 @@ export default function DGModal({ onSave, initialGoals }: GoalsModalProps) {
 
           <button
             type="submit"
-            disabled={!validation.isValid}
-            className={`w-full mt-8 ${validation.isValid ? 'bg-violet-500 hover:bg-violet-600' : 'bg-gray-500 cursor-not-allowed'} text-white py-4 px-6 rounded-xl transition-colors ${protoMono.className}`}
+            disabled={!validation.isValid || isSharing}
+            className={`w-full mt-8 ${validation.isValid && !isSharing ? 'bg-violet-500 hover:bg-violet-600' : 'bg-gray-500 cursor-not-allowed'} text-white py-4 px-6 rounded-xl transition-colors ${protoMono.className} flex items-center justify-center gap-2`}
           >
-            Save Goals
+            {isSharing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Saving & Sharing...
+              </>
+            ) : (
+              'Save & Share Goals'
+            )}
           </button>
         </form>
       </div>

@@ -278,14 +278,18 @@ export default function ChallengeDetail() {
   async function handleInvite(mentions: string[]) {
     if (!challenge) return;
     try {
+      // Asegurar que cada mención tenga @ al inicio
+      const formattedMentions = mentions.map(mention => 
+        mention.startsWith('@') ? mention : `@${mention}`
+      );
+      
       let text = '';
       if (alreadyJoined || joinStatus === 'joined') {
         // Joined share
-        const usernames = mentions.map(m => m.replace(/^@/, '')).join(', ');
-        text = `I just joined the challenge: "${challenge.title}" and I'm inviting ${usernames} to join me.`;
+        text = `I just joined the challenge: "${challenge.title}" and I'm inviting ${formattedMentions.join(' ')} to join me.`;
       } else {
         // Not joined share
-        text = `Check out this challenge: "${challenge.title}"! Join me and let's achieve our goals together! ${mentions.join(' ')}`;
+        text = `Check out this challenge: "${challenge.title}"! Join me and let's achieve our goals together! ${formattedMentions.join(' ')}`;
       }
       const url = `${process.env.NEXT_PUBLIC_URL}/di-challenge/${challenge.id}`;
       await sdk.actions.composeCast({
@@ -353,7 +357,7 @@ export default function ChallengeDetail() {
                   alt={challenge.title || 'Challenge'}
                   width={160}
                   height={160}
-                  className="rounded-lg border border-gray-700 object-cover mb-2"
+                  className="object-cover mb-2"
                   unoptimized
                 />
               )}

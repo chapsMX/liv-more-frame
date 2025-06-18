@@ -162,6 +162,9 @@ async function processPhysicalData(data: RookWebhookData) {
     calories,
     distance_meters: Math.round(distance)
   });
+
+  // Sincronizar challenges activos para este usuario
+  await syncUserChallenges(userFid, date);
 }
 
 /**
@@ -186,6 +189,9 @@ async function processSleepData(data: RookWebhookData) {
   await updateDailyActivity(userFid, date, {
     sleep_hours: sleepDurationHours
   });
+
+  // Sincronizar challenges activos para este usuario
+  await syncUserChallenges(userFid, date);
 }
 
 /**
@@ -297,6 +303,33 @@ async function updateDailyActivity(userFid: string, date: string, data: DailyAct
   } catch (error) {
     console.error('❌ [Webhook] Error actualizando daily_activities:', error);
     throw error;
+  }
+}
+
+/**
+ * Sincroniza challenges activos para un usuario específico
+ */
+async function syncUserChallenges(userFid: string, date: string) {
+  try {
+    console.log('🎯 [Webhook] Syncing challenges for user:', userFid, 'date:', date);
+    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/challenges/sync-daily`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        date,
+        user_fid: userFid 
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ [Webhook] Challenge sync completed:', result);
+    } else {
+      console.error('❌ [Webhook] Error syncing challenges:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ [Webhook] Error calling challenge sync:', error);
   }
 }
 

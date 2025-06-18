@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { EAS } from '@ethereum-attestation-service/eas-sdk';
+import { EAS, SchemaEncoder } from '@ethereum-attestation-service/eas-sdk';
 import { Wallet, JsonRpcProvider } from 'ethers';
 
 const EAS_CONTRACT_ADDRESS = "0x4200000000000000000000000000000000000021";
@@ -22,7 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expirationTime,
       revocable,
       data: encodedData,
-      attesterAddress
+      attesterAddress,
+      // Raw data fields for encoding
+      fid,
+      name,
+      display_name,
+      wallet,
+      metric_type,
+      goal_value,
+      actual_value,
+      timestamp,
+      challenge_id,
+      title,
+      description,
+      image_url
     } = req.body;
 
     console.log('Received delegated sign request:', {
@@ -31,14 +44,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expirationTime,
       revocable,
       encodedDataLength: encodedData?.length,
-      attesterAddress
+      attesterAddress,
+      hasRawData: !!(fid && metric_type)
     });
 
     // Validate required fields
-    if (!schema || !recipient || !encodedData || !attesterAddress) {
+    if (!schema || !recipient) {
       return res.status(400).json({ 
-        error: 'Missing required fields',
-        received: { schema, recipient, encodedData: !!encodedData, attesterAddress }
+        error: 'Missing required fields: schema, recipient',
+        received: { schema, recipient }
       });
     }
 
@@ -60,8 +74,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const signer = new Wallet(PRIVATE_KEY, provider);
     const signerAddress = await signer.getAddress();
     
-    console.log('Signer address:', signerAddress);
-    console.log('Attester address:', attesterAddress);
+    console.log('Backend signer address (will be attester):', signerAddress);
+    console.log('User recipient address:', recipient);
+
+    // Handle data encoding
+    let finalEncodedData = encodedData;
+    
+    // If no encodedData provided but we have raw data fields, encode them
+    if (!encodedData && fid && metric_type) {
+      console.log('Encoding raw data fields...');
+      const schemaEncoder = new SchemaEncoder(
+        "uint256 fid,string name,string display_name,address wallet,string metric_type,uint256 goal_value,uint256 actual_value,uint256 timestamp,string challenge_id,string title,string description,string image_url"
+      );
+
+      finalEncodedData = schemaEncoder.encodeData([
+        { name: "fid", value: fid, type: "uint256" },
+        { name: "name", value: name || "", type: "string" },
+        { name: "display_name", value: display_name || "", type: "string" },
+        { name: "wallet", value: wallet || recipient, type: "address" },
+        { name: "metric_type", value: metric_type, type: "string" },
+        { name: "goal_value", value: goal_value || 0, type: "uint256" },
+        { name: "actual_value", value: actual_value || 0, type: "uint256" },
+        { name: "timestamp", value: timestamp || Math.floor(Date.now() / 1000), type: "uint256" },
+        { name: "challenge_id", value: challenge_id || "", type: "string" },
+        { name: "title", value: title || "", type: "string" },
+        { name: "description", value: description || "", type: "string" },
+        { name: "image_url", value: image_url || "", type: "string" }
+      ]);
+      
+      console.log('Data encoded successfully:', finalEncodedData.length, 'bytes');
+    }
+
+    if (!finalEncodedData) {
+      return res.status(400).json({ 
+        error: 'No data provided - either provide encodedData or raw data fields (fid, metric_type, etc.)'
+      });
+    }
 
     const eas = new EAS(EAS_CONTRACT_ADDRESS);
     await eas.connect(signer);
@@ -87,10 +135,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expirationTime: expTime,
       revocable: revocable || false,
       refUID: ZERO_UID,
-      data: encodedData,
+      data: finalEncodedData,
       deadline: BigInt(0), // No deadline for signature
       value: BigInt(0)
     };
+
+    console.log('Delegated attestation object for signing:', {
+      schema: delegatedAttestation.schema,
+      recipient: delegatedAttestation.recipient,
+      expirationTime: delegatedAttestation.expirationTime.toString(),
+      revocable: delegatedAttestation.revocable,
+      refUID: delegatedAttestation.refUID,
+      dataLength: finalEncodedData.length,
+      deadline: delegatedAttestation.deadline.toString(),
+      value: delegatedAttestation.value.toString(),
+      signerWhoWillSign: signerAddress
+    });
 
     console.log('Signing delegated attestation...');
     const response = await delegated.signDelegatedAttestation(
@@ -100,16 +160,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('Signature created successfully');
 
+    // Return the same format as delegated-sign.ts
     return res.status(200).json({
       signature: response.signature,
-      attester: signerAddress, // The backend signer is the attester
-      deadline: "0", // No deadline
+      encodedData: finalEncodedData,
       delegatedAttestation: {
-        ...delegatedAttestation,
+        schema: delegatedAttestation.schema,
+        recipient: delegatedAttestation.recipient,
         expirationTime: delegatedAttestation.expirationTime.toString(),
+        revocable: delegatedAttestation.revocable,
+        refUID: delegatedAttestation.refUID,
+        data: finalEncodedData,
         deadline: delegatedAttestation.deadline.toString(),
         value: delegatedAttestation.value.toString()
-      }
+      },
+      attester: signerAddress,
+      deadline: "0"
     });
 
   } catch (error: unknown) {

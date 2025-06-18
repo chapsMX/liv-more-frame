@@ -126,14 +126,94 @@ export async function POST(request: Request) {
       );
     }
 
-    // Insertar el reto
+    // Log para debugging
+    console.log('Challenge data to insert:', {
+      user_fid,
+      title,
+      description,
+      activity_type_id,
+      activity_type: activityTypeResult[0].name,
+      objective_type,
+      goal_amount,
+      duration_days,
+      start_date,
+      image_url,
+      is_official,
+      points_value,
+      badge_id,
+      entry_cost
+    });
+
+    // Validación adicional para challenges oficiales
+    if (is_official) {
+      if (!points_value || points_value <= 0) {
+        return NextResponse.json(
+          { error: 'Official challenges require points_value > 0' },
+          { status: 400 }
+        );
+      }
+      if (!badge_id || badge_id <= 0) {
+        return NextResponse.json(
+          { error: 'Official challenges require a valid badge_id' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Para challenges no oficiales, asegurar que points_value y badge_id sean null
+      if (points_value !== null || badge_id !== null) {
+        return NextResponse.json(
+          { error: 'Non-official challenges cannot have points_value or badge_id' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Análisis de la restricción challenges_points_value_check
+    // Basándome en el error, parece que cuando is_official = true, 
+    // la restricción requiere que entry_cost sea NULL o 0
+    // Y cuando is_official = false, points_value y badge_id deben ser NULL
+    
+    let finalPointsValue, finalBadgeId, finalEntryCost;
+    
+    if (is_official) {
+      // Para challenges oficiales
+      finalPointsValue = points_value;
+      finalBadgeId = badge_id;
+      finalEntryCost = null; // Los challenges oficiales no deben tener entry_cost
+      
+      if (!finalPointsValue || finalPointsValue <= 0) {
+        return NextResponse.json(
+          { error: 'Official challenges require points_value > 0' },
+          { status: 400 }
+        );
+      }
+      if (!finalBadgeId || finalBadgeId <= 0) {
+        return NextResponse.json(
+          { error: 'Official challenges require badge_id > 0' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Para challenges no oficiales
+      finalPointsValue = null;
+      finalBadgeId = null;
+      finalEntryCost = entry_cost; // Solo los challenges no oficiales pueden tener entry_cost
+    }
+    
+    console.log('Final values for insert:', {
+      is_official,
+      finalPointsValue,
+      finalBadgeId,
+      finalEntryCost
+    });
+
     const result = await sql`
       INSERT INTO challenges (
         creator_fid,
         title,
         description,
-        activity_type_id,
         activity_type,
+        activity_type_id,
         objective_type,
         goal_amount,
         duration_days,
@@ -142,26 +222,22 @@ export async function POST(request: Request) {
         is_official,
         points_value,
         badge_id,
-        entry_cost,
-        visible,
-        challenge_status
+        entry_cost
       ) VALUES (
         ${user_fid},
         ${title},
         ${description},
-        ${activity_type_id},
         ${activityTypeResult[0].name},
+        ${activity_type_id},
         ${objective_type},
         ${goal_amount},
         ${duration_days},
         ${start_date},
         ${image_url},
         ${is_official},
-        ${points_value},
-        ${badge_id},
-        ${entry_cost},
-        true,
-        'registration'
+        ${finalPointsValue},
+        ${finalBadgeId},
+        ${finalEntryCost}
       )
       RETURNING id
     `;

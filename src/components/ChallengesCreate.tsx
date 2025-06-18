@@ -129,7 +129,7 @@ export default function ChallengesCreate() {
     if (!createdChallenge) return;
     try {
       const text = `I just created a new challenge: "${form.title}"! Join me and let's achieve our goals together! 🎯\n\n${mentions.join(' ')}`;
-      const url = `${process.env.NEXT_PUBLIC_BASE_URL}/challenges/${createdChallenge.challenge_id}`;
+      const url = `${process.env.NEXT_PUBLIC_BASE_URL}/di-challenge/${createdChallenge.challenge_id}`;
       await sdk.actions.composeCast({
         text: text,
         embeds: [url]
