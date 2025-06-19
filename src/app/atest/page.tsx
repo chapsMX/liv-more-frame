@@ -288,7 +288,7 @@ function AttestationTester() {
         <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
           <h5 className="font-medium text-yellow-900 mb-2">⚠️ Wallet Notice</h5>
           <div className="text-sm text-yellow-800 space-y-1">
-            <p><strong>Coinbase Wallet may show:</strong> "Transaction preview unavailable"</p>
+            <p><strong>Coinbase Wallet may show:</strong> Transaction preview unavailable</p>
             <p><strong>This is normal</strong> for EAS attestation transactions.</p>
             <p><strong>Safe to proceed:</strong> The transaction is properly formed and secure.</p>
           </div>

@@ -90,7 +90,7 @@ export async function GET(
         if (neynarRandomResponse.ok) {
           const neynarRandomData = await neynarRandomResponse.json();
           // Filtrar solo usuarios que tienen pfp_url válido
-          randomUsersPfps = (neynarRandomData.users || []).filter((user: any) => 
+          randomUsersPfps = (neynarRandomData.users || []).filter((user: { pfp_url?: string }) => 
             user.pfp_url && user.pfp_url.trim() !== ''
           ).slice(0, 5); // Tomar solo los primeros 5 con PFP válido
         }

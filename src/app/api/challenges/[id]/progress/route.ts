@@ -40,7 +40,6 @@ export async function GET(
     const startDate = new Date(challenge.start_date);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + challenge.duration_days - 1);
-    const today = new Date().toISOString().split('T')[0];
 
     // Obtener participantes con su progreso
     const participantsResult = await sql`

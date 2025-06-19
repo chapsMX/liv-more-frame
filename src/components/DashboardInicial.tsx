@@ -1020,15 +1020,15 @@ export default function DashboardInicial() {
                                   alt={challenge.title || 'Challenge'}
                                   width={120}
                                   height={120}
-                                  className="rounded-lg border border-gray-700 object-cover"
+                                  className="mb-2object-cover"
                                   unoptimized
                                 />
                               </div>
                             )}
                             <div className="flex-1 w-full flex flex-col items-center">
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex flex-col gap-1 mb-1">
                                 <span className="text-sm font-bold text-white py-0 text-center m-0">{challenge.title}</span>
-                                <span className="ml-2 px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold">Official</span>
+                                <span className="px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold">Official</span>
                               </div>
                               <div className="flex flex-wrap gap-1 text-xs text-gray-300 mb-0 justify-left w-full">
                                 <span className="px-1 py-0">Activity: {challenge.activity_type}</span>
