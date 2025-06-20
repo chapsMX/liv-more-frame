@@ -993,21 +993,21 @@ export default function DashboardInicial() {
               </div>
 
               {/* Carrusel de Official Challenges */}
-              <div className="mt-6 w-full max-w-4xl">
-                <div className={`relative z-10 space-y-4 ${protoMono.className}`}>
+              <div className="mt-2 w-full max-w-4xl mb-0">
+                <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
                   <h2 className="text-2xl font-bold text-white text-center">Official Challenges</h2>
                   
-                  <div className="w-full overflow-x-auto pb-2">
-                    <div className="flex flex-row gap-4 snap-x snap-mandatory overflow-x-auto px-1">
+                  <div className="w-full overflow-x-auto pb-2 mb-0">
+                    <div className="flex flex-row gap-4 snap-x snap-mandatory overflow-x-auto px-1 mb-0">
                       {loadingChallenges ? (
-                        <div className="text-gray-400 text-center py-8 w-full">Loading challenges...</div>
+                        <div className="text-gray-400 text-center py-2 w-full">Loading challenges...</div>
                       ) : officialChallenges.length === 0 ? (
-                        <div className="text-gray-400 text-center py-8 w-full">No official challenges available yet.</div>
+                        <div className="text-gray-400 text-center py-2 w-full">No official challenges available yet.</div>
                       ) : (
                         officialChallenges.map((challenge) => (
                           <div
                             key={challenge.id}
-                            className="min-w-[160px] max-w-xs bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg cursor-pointer hover:border-violet-700 transition-colors snap-center"
+                            className="min-w-[280px] max-w-xs bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg cursor-pointer hover:border-violet-700 transition-colors snap-center"
                             onClick={() => router.push(`/challenges/${challenge.id}`)}
                             role="button"
                             tabIndex={0}
@@ -1025,17 +1025,13 @@ export default function DashboardInicial() {
                                 />
                               </div>
                             )}
-                            <div className="flex-1 w-full flex flex-col items-center">
+                            <div className="flex-1 w-full flex flex-col items-center mb-0">
                               <div className="flex flex-col gap-1 mb-1">
-                                <span className="text-sm font-bold text-white py-0 text-center m-0">{challenge.title}</span>
-                                <span className="px-2 py-0.5 text-xs rounded bg-violet-700 text-white font-semibold">Official</span>
+                                <span className="text-2xs font-bold text-white py-0 text-center m-0">{challenge.title}</span>
                               </div>
                               <div className="flex flex-wrap gap-1 text-xs text-gray-300 mb-0 justify-left w-full">
-                                <span className="px-1 py-0">Activity: {challenge.activity_type}</span>
+                                <span className="px-1 py-0">Activity: {challenge.activity_type}</span><br/>
                                 <span className="px-1 py-0">Start: {challenge.start_date ? new Date(challenge.start_date).toLocaleDateString() : '-'}</span>
-{/*                                 {challenge.points_value && (
-                                  <span className="bg-violet-800 px-2 py-1 rounded">Points: {challenge.points_value}</span>
-                                )} */}
                               </div>
                             </div>
                           </div>
@@ -1153,7 +1149,7 @@ export default function DashboardInicial() {
                   </div>
 
                   {/* Métricas semanales */}
-                  <div className="mt-6 space-y-6">
+                  <div className="mt-6 space-y-2">
                     {/* Calorías */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1165,8 +1161,8 @@ export default function DashboardInicial() {
                           Week: {calculateWeeklyTotal(weeklyMetrics.calories).toLocaleString()}
                         </span>
                       </div>
-                      <div className="bg-[#0B1222] rounded-xl p-6">
-                        <div className="flex justify-between h-[200px] mb-4">
+                      <div className="bg-[#0B1222] rounded-xl p-1">
+                        <div className="flex justify-between h-[200px] mb-2">
                           {weeklyMetrics.calories.map((day, index) => (
                             <div key={index} className="flex flex-col items-center justify-end h-full w-full">
                               <div className="w-8 h-full relative flex items-end">
@@ -1183,8 +1179,8 @@ export default function DashboardInicial() {
                         <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.calories.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
-                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                              <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
+                              <span className="text-white text-2xs mb-0">{getWeekDays()[index]}</span>
+                              <span className="text-white text-xs">{day.value.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
@@ -1202,8 +1198,8 @@ export default function DashboardInicial() {
                           Week: {calculateWeeklyTotal(weeklyMetrics.steps).toLocaleString()}
                         </span>
                       </div>
-                      <div className="bg-[#0B1222] rounded-xl p-6">
-                        <div className="flex justify-between h-[200px] mb-4">
+                      <div className="bg-[#0B1222] rounded-xl p-1">
+                        <div className="flex justify-between h-[200px] mb-2">
                           {weeklyMetrics.steps.map((day, index) => (
                             <div key={index} className="flex flex-col items-center justify-end h-full w-full">
                               <div className="w-8 h-full relative flex items-end">
@@ -1220,8 +1216,8 @@ export default function DashboardInicial() {
                         <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.steps.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
-                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                              <span className="text-gray-500 text-sm">{day.value.toLocaleString()}</span>
+                              <span className="text-white text-2xs mb-0">{getWeekDays()[index]}</span>
+                              <span className="text-white text-xs">{day.value.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
@@ -1239,8 +1235,8 @@ export default function DashboardInicial() {
                           Avg: {calculateWeeklyAverage(weeklyMetrics.sleep)}h
                         </span>
                       </div>
-                      <div className="bg-[#0B1222] rounded-xl p-6">
-                        <div className="flex justify-between h-[200px] mb-4">
+                      <div className="bg-[#0B1222] rounded-xl p-1">
+                        <div className="flex justify-between h-[200px] mb-2">
                           {weeklyMetrics.sleep.map((day, index) => (
                             <div key={index} className="flex flex-col items-center justify-end h-full w-full">
                               <div className="w-8 h-full relative flex items-end">
@@ -1257,8 +1253,8 @@ export default function DashboardInicial() {
                         <div className="grid grid-cols-7 gap-1 text-center pt-2">
                           {weeklyMetrics.sleep.map((day, index) => (
                             <div key={`label-${index}`} className="flex flex-col items-center">
-                              <span className="text-gray-400 text-sm mb-1">{getWeekDays()[index]}</span>
-                              <span className="text-gray-500 text-sm">{`${day.value}h`}</span>
+                              <span className="text-white text-2xs mb-1">{getWeekDays()[index]}</span>
+                              <span className="text-white text-xs">{`${day.value}h`}</span>
                             </div>
                           ))}
                         </div>
