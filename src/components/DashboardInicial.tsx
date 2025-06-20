@@ -7,11 +7,9 @@ import { useUser } from '../context/UserContext';
 import { useRouter } from 'next/navigation';
 import { ControlPanel } from './ControlPanel';
 import DGModal from './DGModal';
+import MintModal from './MintModal';
 import { sdk } from "@farcaster/frame-sdk";
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg';
-import { EAS } from "@ethereum-attestation-service/eas-sdk";
-import { BrowserProvider } from "ethers";
-import type { TransactionReceipt } from "ethers";
 
 // Helper para calcular fecha de finalización (comentado porque no se usa actualmente)
 // function getEndDate(startDate: string, durationDays: number) {
@@ -51,10 +49,8 @@ export default function DashboardInicial() {
     sleep: Array(6).fill({ value: 0, percentage: 0 })
   });
 
-  const [isCreatingAttestation, setIsCreatingAttestation] = useState({ steps: false, calories: false, sleep: false });
-  const [attestationError, setAttestationError] = useState<{ steps: string | null, calories: string | null, sleep: string | null }>({ steps: null, calories: null, sleep: null });
-  const [attestationSuccess, setAttestationSuccess] = useState<{ steps: string | null, calories: string | null, sleep: string | null }>({ steps: null, calories: null, sleep: null });
   const [createdAttestations, setCreatedAttestations] = useState<{ steps: boolean, calories: boolean, sleep: boolean }>({ steps: false, calories: false, sleep: false });
+  const [showMintModal, setShowMintModal] = useState(false);
   
   // State para challenges oficiales
   const [officialChallenges, setOfficialChallenges] = useState<Challenge[]>([]);
@@ -71,13 +67,7 @@ export default function DashboardInicial() {
     is_official: boolean;
   }
 
-  // Determine the metric with an active status (error or success) to display a single message
-  let metricWithActiveStatus: 'calories' | 'steps' | 'sleep' | null = null;
-  (['calories', 'steps', 'sleep'] as const).forEach((metric) => {
-    if (attestationError[metric] || attestationSuccess[metric]) {
-      metricWithActiveStatus = metric;
-    }
-  });
+
 
   // Función para guardar actividad diaria en la base de datos
   const saveDailyActivity = useCallback(async (userFid: number | string, date: string, metrics: { steps: number; calories: number; sleep: number }) => {
@@ -137,22 +127,7 @@ export default function DashboardInicial() {
     }
   }, []);
 
-  // const para el servicio de atestaciones de ethereum
-  const EAS_CONTRACT_ADDRESS = "0x4200000000000000000000000000000000000021";
 
-  const BASE_CHAIN_ID = '0x2105'; // 8453 in hex
-  const BASE_PARAMS = {
-    chainId: BASE_CHAIN_ID,
-    chainName: 'Base Mainnet',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    rpcUrls: ['https://mainnet.base.org'],
-    blockExplorerUrls: ['https://basescan.org'],
-  };
-
-  // const para las imagenes de las atestaciones
-  const sleepimage = "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreifubmrhdminkoz4kbir43zktganyrknarka7jb3i6sgjx6k7aklwy";
-  const stepsimage = "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreidjr3w5yzdqhafqsaynss35kiwdqa4p42fkjpnjzdnx2thkubkxxq";
-  const caloriesimage = "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreiatwphioasnrhctap2z4uh2zj2vsohxvwpyx7mpaufuwiu2blhm5y";
 
   const checkConnection = useCallback(async () => {
     try {
@@ -478,54 +453,7 @@ export default function DashboardInicial() {
     }
   }
 
-  // funcion compartir atestaciones
-  const attestationShare = async (metricType: 'steps' | 'calories' | 'sleep', attestationUID: string) => {
-    try {
-      let achievementText = '';
-      const currentValue = dailyMetrics[metricType];
-      const goalValue = goals[metricType];
-      // seleccionamos la imagen de acuerdo al tipo de actividad
-      let image_url = '';
-      if (metricType === 'sleep') image_url = sleepimage;
-      else if (metricType === 'steps') image_url = stepsimage;
-      else if (metricType === 'calories') image_url = caloriesimage;
 
-      switch (metricType) {
-        case 'steps':
-          achievementText = `🥾 ${currentValue} steps stored onchain! 🥾\n` +
-            `Walked ${currentValue} steps today, my goal was ${goalValue}.\n` +
-            `One foot in front of the other, and now it's onchain.\n` +
-            `Attested on @base. Let's keep moving 💪🧬\n` +
-            `@livmore`;
-          break;
-        case 'calories':
-          achievementText = `🔥 ${currentValue} calories burned & stored onchain! 🔥\n` +
-            `Burned ${currentValue} kcal out of my ${goalValue} kcal goal.\n` +
-            `Pushed through and now my effort is stored forever, attested on @base 🧬 💪\n` +
-            `@livmore`;
-          break;
-        case 'sleep':
-          achievementText = `😴 ${currentValue}hrs slept and stored onchain 😴\n` +
-            `Slept ${currentValue} hours, beat my ${goalValue} target.\n` +
-            `Rested, recharged, and now… attested.\n` +
-            `Proof of sleep on @base 🛌🧬\n` +
-            `@livmore`;
-          break;
-      }
-      
-      // nos aseguramos que el uid esté en minusculas
-      const formattedUID = attestationUID.toLowerCase();
-      const url = `https://base.easscan.org/attestation/view/${formattedUID}`;
-      console.log('Sharing attestation with URL:', url);
-      
-      await sdk.actions.composeCast({
-        text: achievementText,
-        embeds: [url, image_url]
-      });
-    } catch (error) {
-      console.error('Error sharing achievement:', error);
-    }
-  };
 
   const handleShare = async () => {
     try {
@@ -641,28 +569,7 @@ export default function DashboardInicial() {
     syncTimezoneIfNeeded();
   }, [userState.userFid, userState.timezone, setUserState]);
 
-  const ensureBaseNetwork = async () => {
-    if (!window.ethereum) throw new Error('No crypto wallet found');
-    const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (currentChainId !== BASE_CHAIN_ID) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: BASE_CHAIN_ID }],
-        });
-      } catch (switchError: unknown) {
-        // This error code indicates the chain has not been added to MetaMask.
-        if (typeof switchError === 'object' && switchError !== null && 'code' in switchError && switchError.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [BASE_PARAMS],
-          });
-        } else {
-          throw switchError;
-        }
-      }
-    }
-  };
+
 
   const checkExistingAttestations = useCallback(async () => {
     if (!userState.userFid) return;
@@ -704,156 +611,18 @@ export default function DashboardInicial() {
     fetchOfficialChallenges();
   }, []);
 
-  const createAttestation = async (metricType: 'steps' | 'calories' | 'sleep') => {
-    setIsCreatingAttestation(prev => ({ ...prev, [metricType]: true }));
-    setAttestationError(prev => ({ ...prev, [metricType]: null }));
-    setAttestationSuccess(prev => ({ ...prev, [metricType]: null }));
+  // Function to handle attestation creation via modal
+  const handleAttestationCreated = (metric: 'calories' | 'steps' | 'sleep') => {
+    setCreatedAttestations(prev => ({ ...prev, [metric]: true }));
+  };
 
-    try {
-      // 1. Ensure we're on Base network
-      await ensureBaseNetwork();
-
-      // 2. Get user context
-      const context = await sdk.context;
-      if (!context.user?.fid) {
-        throw new Error('User not found');
-      }
-
-      // 3. Prepare attestation data
-      const currentValue = dailyMetrics[metricType] || 0;
-      const goalValue = metricType === 'sleep' 
-        ? userGoals.sleep_hours_goal 
-        : userGoals[`${metricType}_goal`] || 0;
-
-      // Select image based on metric type
-      let image_url = '';
-      if (metricType === 'sleep') image_url = sleepimage;
-      else if (metricType === 'steps') image_url = stepsimage;
-      else if (metricType === 'calories') image_url = caloriesimage;
-
-      const attestationPayload = {
-        fid: context.user.fid,
-        name: context.user.username || "",
-        display_name: context.user.displayName || context.user.username || "",
-        wallet: userState.ethAddress,
-        metric_type: metricType,
-        goal_value: Math.floor(goalValue),
-        actual_value: Math.max(1, Math.floor(currentValue)),
-        timestamp: Math.floor(Date.now() / 1000),
-        challenge_id: "",
-        title: `${metricType.charAt(0).toUpperCase() + metricType.slice(1)} Goal Achieved`,
-        description: `Achieved ${currentValue} ${metricType} out of ${goalValue} goal`,
-        image_url
-      };
-
-      // 4. Get delegated signature
-      const signResponse = await fetch('/api/attestations/delegated-sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(attestationPayload),
-      });
-
-      if (!signResponse.ok) {
-        const errorData = await signResponse.json();
-        throw new Error(errorData.error || 'Failed to get delegated signature');
-      }
-
-      const signResult = await signResponse.json();
-
-      // 5. Initialize EAS contract
-      const provider = new BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      
-      // Create EAS instance with signer
-      const eas = new EAS(EAS_CONTRACT_ADDRESS);
-      eas.connect(signer);
-
-      // 6. Create attestation
-      const tx = await eas.attestByDelegation({
-        schema: signResult.delegatedAttestation.schema,
-        data: {
-          recipient: signResult.delegatedAttestation.recipient,
-          expirationTime: BigInt(signResult.delegatedAttestation.expirationTime),
-          revocable: signResult.delegatedAttestation.revocable,
-          refUID: signResult.delegatedAttestation.refUID,
-          data: signResult.encodedData
-        },
-        signature: signResult.signature,
-        attester: signResult.attester,
-        deadline: BigInt(signResult.deadline)
-      });
-
-      // 7. Wait for transaction
-      const receipt = await tx.wait() as unknown as TransactionReceipt;
-      console.log('Attestation transaction receipt:', receipt);
-
-      // 8. Get attestation UID from transaction
-      const attestationUID = receipt.toString();
-      console.log('Attestation UID:', attestationUID);
-
-      // Verify the attestation exists
-      const attestation = await eas.getAttestation(attestationUID);
-      if (!attestation) {
-        throw new Error('Attestation not found after creation');
-      }
-
-      // 9. Save attestation to database
-      try {
-        const saveResponse = await fetch('/api/attestations/save-attestation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_fid: context.user.fid,
-            name: context.user.username || "",
-            display_name: context.user.displayName || context.user.username || "",
-            wallet: userState.ethAddress,
-            metric_type: metricType,
-            goal_value: Math.floor(goalValue),
-            actual_value: Math.max(1, Math.floor(currentValue)),
-            timestamp: Math.floor(Date.now() / 1000),
-            challenge_id: "",
-            title: `${metricType.charAt(0).toUpperCase() + metricType.slice(1)} Goal Achieved`,
-            description: `Achieved ${currentValue} ${metricType} out of ${goalValue} goal`,
-            image_url: image_url,
-            attestation_uid: attestationUID,
-            date: new Date().toISOString().split('T')[0]
-          }),
-        });
-
-        if (!saveResponse.ok) {
-          const errorData = await saveResponse.json();
-          throw new Error(errorData.error || 'Failed to save attestation to database');
-        }
-
-        const saveResult = await saveResponse.json();
-        console.log('Attestation saved to database:', saveResult);
-
-        setCreatedAttestations(prev => ({ ...prev, [metricType]: true }));
-        
-        setAttestationSuccess(prev => ({ 
-          ...prev, 
-          [metricType]: `Successfully created attestation!` 
-        }));
-
-        // Share the attestation on Farcaster automatically
-        await attestationShare(metricType, attestationUID);
-      } catch (error) {
-        console.error('Error saving attestation to database:', error);
-        setAttestationError(prev => ({ 
-          ...prev, 
-          [metricType]: error instanceof Error ? error.message : 'Failed to save attestation to database' 
-        }));
-      }
-
-    } catch (error) {
-      console.error('Error creating attestation:', error);
-      setAttestationError(prev => ({ 
-        ...prev, 
-        [metricType]: error instanceof Error ? error.message : 'Failed to create attestation' 
-      }));
-    } finally {
-      setIsCreatingAttestation(prev => ({ ...prev, [metricType]: false }));
-    }
+  // Function to determine eligible metrics for attestation
+  const getEligibleMetrics = () => {
+    return {
+      calories: (dailyMetrics.calories / goals.calories) >= 1,
+      steps: (dailyMetrics.steps / goals.steps) >= 1,
+      sleep: (dailyMetrics.sleep / goals.sleep) >= 1
+    };
   };
 
   if (isCheckingAccess) {
@@ -1062,79 +831,30 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-              {/* Attestation Section - Only show if at least one goal is met */}
+              {/* Mint Attestations Section - Only show if at least one goal is met */}
               {(['calories', 'steps', 'sleep'] as const).some(metric => 
                 (dailyMetrics[metric] / goals[metric]) >= 1
               ) && (
                 <div className="w-full max-w-4xl space-y-4 mb-0">
-                  <div className="grid grid-cols-3 gap-4">
-                    {(['calories', 'steps', 'sleep'] as const).map((metric) => {
-                      const isGoalMet = (dailyMetrics[metric] / goals[metric]) >= 1;
-                      const isAlreadyCreated = createdAttestations[metric];
-                      const isCreating = isCreatingAttestation[metric];
-                      
-                      return (
-                        <div key={metric} className="flex flex-col space-y-2">
-                          <button
-                            onClick={() => createAttestation(metric)}
-                            disabled={isCreating || !isGoalMet || isAlreadyCreated}
-                            className={`p-0 rounded-xl border-2 ${
-                              isCreating
-                                ? 'border-gray-600 bg-gray-800 cursor-not-allowed'
-                                : isGoalMet && !isAlreadyCreated
-                                  ? 'border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A]'
-                                  : 'border-gray-600 bg-gray-800 cursor-not-allowed opacity-50'
-                            } transition-all duration-300 ease-in-out transform hover:scale-105`}
-                          >
-                            {isCreating ? (
-                              <div className="flex items-center justify-center py-2">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#00FF94]"></div>
-                                <span className="ml-2 text-[#00FF94]">Creating...</span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center center space-y-0 py-2">
-                                <span className={`text-2sm font-bold ${protoMono.className}`}>
-                                  {metric.charAt(0).toUpperCase() + metric.slice(1)}
-                                </span>
-                                <span className={`text-2xs text-gray-400 ${protoMono.className}`}>
-                                  {isAlreadyCreated ? 'Attested' : 'Attest'}
-                                </span>
-                              </div>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                    <p className={`text-lg mb-0 font-bold text-white`}>
-                      Congratulations, you did it!
-                    </p>
-                    <p className={`text-base text-gray-300`}>
-                      Mint an attestation to prove your achievement
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Attestation Status and Share Button - Full Width */}
-              {metricWithActiveStatus && (
-                <div key="attestation-status-full-width" className={`w-full max-w-4xl mx-auto text-center mt-4 mb-0 ${protoMono.className}`}>
-                  {attestationError[metricWithActiveStatus] && (
-                    <p className="text-red-500 text-sm">{attestationError[metricWithActiveStatus]}</p>
-                  )}
-                  
-                  {attestationSuccess[metricWithActiveStatus] && (
-                    <div className="flex flex-col items-center space-y-2">
-                      <p className="text-[#00FF94] text-sm">{attestationSuccess[metricWithActiveStatus]}</p>
-                      <button
-                        onClick={() => attestationShare(metricWithActiveStatus!, '')}
-                        className="text-sm text-[#00FF94] hover:text-[#00FF94]/80 transition-colors"
-                      >
-                        Share on Farcaster
-                      </button>
+                  <div className={`text-center space-y-4 ${protoMono.className}`}>
+                    <div>
+                      <p className={`text-lg mb-2 font-bold text-white`}>
+                        Congratulations, you did it! 🎉
+                      </p>
+                      <p className={`text-base text-gray-300 mb-4`}>
+                        You have achieved your daily goals. Mint an attestation to prove your achievement onchain.
+                      </p>
                     </div>
-                  )}
+                    
+                    <button
+                      onClick={() => setShowMintModal(true)}
+                      className="w-full max-w-md mx-auto py-3 px-6 rounded-xl border-2 border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300 ease-in-out transform hover:scale-105"
+                    >
+                      <span className={`text-lg font-bold text-[#00FF94] ${protoMono.className}`}>
+                        🏆 Mint Attestations
+                      </span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1269,6 +989,18 @@ export default function DashboardInicial() {
           {/* Control Panel Modal */}
           {showControlPanel && (
             <ControlPanel onClose={() => setShowControlPanel(false)} />
+          )}
+
+          {/* Mint Attestations Modal */}
+          {showMintModal && (
+            <MintModal
+              onClose={() => setShowMintModal(false)}
+              eligibleMetrics={getEligibleMetrics()}
+              dailyMetrics={dailyMetrics}
+              userGoals={userGoals}
+              createdAttestations={createdAttestations}
+              onAttestationCreated={handleAttestationCreated}
+            />
           )}
         </>
       )}

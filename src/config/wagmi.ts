@@ -1,6 +1,7 @@
 import { http, createConfig } from 'wagmi'
 import { base } from 'wagmi/chains'
 import { farcasterFrame as miniAppConnector } from '@farcaster/frame-wagmi-connector'
+import { metaMask, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
 export const config = createConfig({
   chains: [base],
@@ -8,7 +9,21 @@ export const config = createConfig({
     [base.id]: http(),
   },
   connectors: [
-    miniAppConnector()
+    miniAppConnector(),
+    metaMask(),
+    coinbaseWallet({
+      appName: 'LivMore',
+      appLogoUrl: 'https://livmore.app/icon.png',
+    }),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '',
+      metadata: {
+        name: 'LivMore',
+        description: 'Turn healthy habits into rewards',
+        url: 'https://livmore.app',
+        icons: ['https://livmore.app/icon.png'],
+      },
+    }),
   ]
 })
 

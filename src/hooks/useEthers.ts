@@ -10,11 +10,19 @@ import { type Config, useClient, useConnectorClient } from "wagmi";
 
 export function clientToProvider(client: Client<Transport, Chain>) {
   const { chain, transport } = client;
-  const network = {
+  
+  // For Base network (8453), explicitly disable ENS support
+  const network = chain.id === 8453 ? {
     chainId: chain.id,
     name: chain.name,
-    ensAddress: chain.contracts?.ensRegistry?.address,
+    // Explicitly no ENS for Base
+  } : {
+    chainId: chain.id,
+    name: chain.name,
+    // Don't include ensAddress for chains that don't support ENS like Base
+    ...(chain.contracts?.ensRegistry?.address && { ensAddress: chain.contracts.ensRegistry.address }),
   };
+  
   if (transport.type === "fallback") {
     const providers = (transport.transports as ReturnType<Transport>[]).map(
       ({ value }) => new JsonRpcProvider(value?.url, network)
@@ -27,11 +35,19 @@ export function clientToProvider(client: Client<Transport, Chain>) {
 
 export function clientToSigner(client: Client<Transport, Chain, Account>) {
   const { account, chain, transport } = client;
-  const network = {
+  
+  // For Base network (8453), explicitly disable ENS support
+  const network = chain.id === 8453 ? {
     chainId: chain.id,
     name: chain.name,
-    ensAddress: chain.contracts?.ensRegistry?.address,
+    // Explicitly no ENS for Base
+  } : {
+    chainId: chain.id,
+    name: chain.name,
+    // Don't include ensAddress for chains that don't support ENS like Base
+    ...(chain.contracts?.ensRegistry?.address && { ensAddress: chain.contracts.ensRegistry.address }),
   };
+  
   const provider = new BrowserProvider(transport, network);
   const signer = new JsonRpcSigner(provider, account.address);
   return signer;

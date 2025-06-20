@@ -240,10 +240,10 @@ export function ControlPanel({ onClose }: ControlPanelProps) {
             {/* Botón de Atest - Solo visible para usuarios autorizados */}
             {isAuthorizedForTesting(userState.userFid) && (
               <button 
-                onClick={() => handleNavigation('/atest')}
+                onClick={() => handleNavigation('/leaderboard')}
                 className="w-full flex justify-between items-center py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-800 transition-colors"
               >
-                <span className="text-gray-400">Atest</span>
+                <span className="text-gray-400">FC Leadeerboard</span>
                 <span className="text-white">→</span>
               </button>
             )}
