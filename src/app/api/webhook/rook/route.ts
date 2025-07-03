@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ 
         success: true,
-        message: `Datos de tipo ${dataType} procesados correctamente`
+        message: `Datos de tipo ${dataType} procesados correctamente en v2_daily_activities`
       });
 
     } catch (processingError) {
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
  */
 async function processPhysicalData(data: RookWebhookData) {
   const { user_id } = data;
-  const date = extractDate(data);
+  const activityDate = extractDate(data);
   
   // Extraer datos del resumen físico
   const physicalSummary = data.physical_health?.summary?.physical_summary;
@@ -156,15 +156,18 @@ async function processPhysicalData(data: RookWebhookData) {
     throw new Error(`No se encontró user_fid para user_id: ${user_id}`);
   }
 
-  // Actualizar o crear registro en daily_activities
-  await updateDailyActivity(userFid, date, {
+  // Extraer data source del metadata
+  const dataSource = physicalSummary?.metadata?.sources_of_data_array?.[0] || 'unknown';
+
+  // Actualizar v2_daily_activities
+  await updateDailyActivityV2(userFid, activityDate, {
     steps,
     calories,
     distance_meters: Math.round(distance)
-  });
+  }, dataSource, user_id, physicalSummary?.metadata);
 
   // Sincronizar challenges activos para este usuario
-  await syncUserChallenges(userFid, date);
+  await syncUserChallenges(userFid, activityDate);
 }
 
 /**
@@ -172,7 +175,7 @@ async function processPhysicalData(data: RookWebhookData) {
  */
 async function processSleepData(data: RookWebhookData) {
   const { user_id } = data;
-  const date = extractDate(data);
+  const activityDate = extractDate(data);
   
   // Extraer datos del resumen de sueño
   const sleepSummary = data.sleep_health?.summary?.sleep_summary;
@@ -185,17 +188,20 @@ async function processSleepData(data: RookWebhookData) {
     throw new Error(`No se encontró user_fid para user_id: ${user_id}`);
   }
 
-  // Actualizar o crear registro en daily_activities
-  await updateDailyActivity(userFid, date, {
+  // Extraer data source del metadata
+  const dataSource = sleepSummary?.metadata?.sources_of_data_array?.[0] || 'unknown';
+
+  // Actualizar v2_daily_activities
+  await updateDailyActivityV2(userFid, activityDate, {
     sleep_hours: sleepDurationHours
-  });
+  }, dataSource, user_id, sleepSummary?.metadata);
 
   // Sincronizar challenges activos para este usuario
-  await syncUserChallenges(userFid, date);
+  await syncUserChallenges(userFid, activityDate);
 }
 
 /**
- * Extrae la fecha de los datos recibidos
+ * Extrae la fecha de los datos recibidos (lógica simple como en el webhook viejo)
  */
 function extractDate(data: RookWebhookData): string {
   // Intentar obtener la fecha de diferentes ubicaciones en los datos
@@ -229,7 +235,7 @@ async function getUserFidFromRookId(rookUserId: string): Promise<string | null> 
   try {
     const result = await sql`
       SELECT user_fid 
-      FROM user_connections 
+      FROM rook_connection 
       WHERE rook_user_id = ${rookUserId}
       LIMIT 1
     `;
@@ -242,66 +248,125 @@ async function getUserFidFromRookId(rookUserId: string): Promise<string | null> 
 }
 
 /**
- * Actualiza o crea un registro en daily_activities
+ * Actualiza o crea un registro en v2_daily_activities
  */
-async function updateDailyActivity(userFid: string, date: string, data: DailyActivityData) {
+async function updateDailyActivityV2(
+  userFid: string, 
+  activityDate: string, 
+  data: DailyActivityData,
+  dataSource?: string,
+  rookUserId?: string,
+  metadata?: any
+) {
   try {
-    // Verificar si existe un registro para esa fecha
+    const processingDate = new Date().toISOString().split('T')[0];
+    
+    console.log('📝 [Webhook] Updating v2_daily_activities:', {
+      userFid,
+      activityDate,
+      processingDate,
+      data,
+      dataSource
+    });
+
+    // Verificar si existe un registro para esa activity_date
     const existingRecord = await sql`
-      SELECT id FROM daily_activities
-      WHERE user_fid = ${userFid} AND date = ${date}
+      SELECT id FROM v2_daily_activities
+      WHERE user_fid = ${userFid} AND activity_date = ${activityDate}
       LIMIT 1
     `;
 
     if (existingRecord.length > 0) {
-      // Para actualización, actualizamos cada campo individualmente
-      for (const [key, value] of Object.entries(data)) {
-        if (key === 'steps') {
-          await sql`
-            UPDATE daily_activities
-            SET steps = ${value}, updated_at = CURRENT_TIMESTAMP
-            WHERE user_fid = ${userFid} AND date = ${date}
-          `;
-        } else if (key === 'calories') {
-          await sql`
-            UPDATE daily_activities
-            SET calories = ${value}, updated_at = CURRENT_TIMESTAMP
-            WHERE user_fid = ${userFid} AND date = ${date}
-          `;
-        } else if (key === 'distance_meters') {
-          await sql`
-            UPDATE daily_activities
-            SET distance_meters = ${value}, updated_at = CURRENT_TIMESTAMP
-            WHERE user_fid = ${userFid} AND date = ${date}
-          `;
-        } else if (key === 'sleep_hours') {
-          await sql`
-            UPDATE daily_activities
-            SET sleep_hours = ${value}, updated_at = CURRENT_TIMESTAMP
-            WHERE user_fid = ${userFid} AND date = ${date}
-          `;
-        }
-      }
-    } else {
-      // Para inserción, usamos una consulta específica según los datos disponibles
+      // Actualizar registro existente
       if ('steps' in data || 'calories' in data || 'distance_meters' in data) {
         await sql`
-          INSERT INTO daily_activities
-            (user_fid, date, steps, calories, distance_meters, created_at, updated_at)
-          VALUES
-            (${userFid}, ${date}, ${data.steps || 0}, ${data.calories || 0}, ${data.distance_meters || 0}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          UPDATE v2_daily_activities
+          SET 
+            steps = COALESCE(${data.steps}, steps),
+            calories = COALESCE(${data.calories}, calories),
+            distance_meters = COALESCE(${data.distance_meters}, distance_meters),
+            processing_date = ${processingDate},
+            data_source = COALESCE(${dataSource}, data_source),
+            rook_user_id = COALESCE(${rookUserId}, rook_user_id),
+            webhook_metadata = COALESCE(${metadata ? JSON.stringify(metadata) : null}::jsonb, webhook_metadata),
+            updated_at = CURRENT_TIMESTAMP
+          WHERE user_fid = ${userFid} AND activity_date = ${activityDate}
         `;
       } else if ('sleep_hours' in data) {
         await sql`
-          INSERT INTO daily_activities
-            (user_fid, date, sleep_hours, created_at, updated_at)
-          VALUES
-            (${userFid}, ${date}, ${data.sleep_hours}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          UPDATE v2_daily_activities
+          SET 
+            sleep_hours = ${data.sleep_hours},
+            processing_date = ${processingDate},
+            data_source = COALESCE(${dataSource}, data_source),
+            rook_user_id = COALESCE(${rookUserId}, rook_user_id),
+            webhook_metadata = COALESCE(${metadata ? JSON.stringify(metadata) : null}::jsonb, webhook_metadata),
+            updated_at = CURRENT_TIMESTAMP
+          WHERE user_fid = ${userFid} AND activity_date = ${activityDate}
         `;
       }
+      
+      console.log('✅ [Webhook] Record updated successfully');
+    } else {
+      // Crear nuevo registro
+      if ('steps' in data || 'calories' in data || 'distance_meters' in data) {
+        await sql`
+          INSERT INTO v2_daily_activities (
+            user_fid,
+            activity_date,
+            processing_date,
+            steps,
+            calories,
+            distance_meters,
+            data_source,
+            rook_user_id,
+            webhook_metadata,
+            created_at,
+            updated_at
+          ) VALUES (
+            ${userFid},
+            ${activityDate},
+            ${processingDate},
+            ${data.steps || 0},
+            ${data.calories || 0},
+            ${data.distance_meters || 0},
+            ${dataSource},
+            ${rookUserId},
+            ${metadata ? JSON.stringify(metadata) : null}::jsonb,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          )
+        `;
+      } else if ('sleep_hours' in data) {
+        await sql`
+          INSERT INTO v2_daily_activities (
+            user_fid,
+            activity_date,
+            processing_date,
+            sleep_hours,
+            data_source,
+            rook_user_id,
+            webhook_metadata,
+            created_at,
+            updated_at
+          ) VALUES (
+            ${userFid},
+            ${activityDate},
+            ${processingDate},
+            ${data.sleep_hours || 0},
+            ${dataSource},
+            ${rookUserId},
+            ${metadata ? JSON.stringify(metadata) : null}::jsonb,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          )
+        `;
+      }
+      
+      console.log('✅ [Webhook] New record created successfully');
     }
   } catch (error) {
-    console.error('❌ [Webhook] Error actualizando daily_activities:', error);
+    console.error('❌ [Webhook] Error updating v2_daily_activities:', error);
     throw error;
   }
 }

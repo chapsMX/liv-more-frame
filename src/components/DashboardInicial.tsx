@@ -69,38 +69,7 @@ export default function DashboardInicial() {
 
 
 
-  // Función para guardar actividad diaria en la base de datos
-  const saveDailyActivity = useCallback(async (userFid: number | string, date: string, metrics: { steps: number; calories: number; sleep: number }) => {
-    try {
-      const response = await fetch('/api/users/save-daily-activity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_fid: userFid,
-          date: date,
-          steps: metrics.steps,
-          calories: metrics.calories,
-          sleep_hours: metrics.sleep,
-          steps_completed: metrics.steps >= userGoals.steps_goal,
-          calories_completed: metrics.calories >= userGoals.calories_goal,
-          sleep_completed: metrics.sleep >= userGoals.sleep_hours_goal,
-          all_completed: metrics.steps >= userGoals.steps_goal && 
-                        metrics.calories >= userGoals.calories_goal && 
-                        metrics.sleep >= userGoals.sleep_hours_goal
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('❌ Error saving daily activity:', await response.text());
-      } else {
-        console.log('✅ Daily activity saved successfully');
-      }
-    } catch (error) {
-      console.error('❌ Error saving daily activity:', error);
-    }
-  }, [userGoals.steps_goal, userGoals.calories_goal, userGoals.sleep_hours_goal]);
+  // ❌ REMOVED: saveDailyActivity function - webhook handles this automatically
 
   // Función para sincronizar challenges activos del usuario
   const syncUserChallenges = useCallback(async (userFid: number | string, date: string) => {
@@ -274,134 +243,73 @@ export default function DashboardInicial() {
     userState.connectedProvider
   ]);
 
-  // Utilidad para obtener la fecha YYYY-MM-DD en la zona horaria del usuario
+  // ✅ IMPROVED: Utilidad robusta para obtener la fecha YYYY-MM-DD en la zona horaria del usuario
   function getLocalDateString(date: Date, tz: string) {
-    // Convierte la fecha a la zona horaria del usuario y retorna YYYY-MM-DD
-    const local = new Date(date.toLocaleString('en-US', { timeZone: tz }));
-    return local.toISOString().split('T')[0];
+    // Usar Intl.DateTimeFormat para conversión consistente de timezone
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date);
   }
 
+  // ✅ OPTIMIZED: Single useEffect using local database instead of 50+ Rook API calls
   useEffect(() => {
-    const fetchHealthMetrics = async () => {
-      if (!userState.userFid || !userState.connectedProvider || !userState.timezone) return;
-
-      // Obtener la fecha de hoy en la zona horaria del usuario
-      const today = getLocalDateString(new Date(), userState.timezone);
-      
-      try {
-        // Primero obtener el rook_user_id
-        const rookUserResponse = await fetch(`/api/users/get-rook-user?fid=${userState.userFid}`);
-        if (!rookUserResponse.ok) {
-          console.error('❌ Error obteniendo rook_user_id');
-          return;
-        }
-        
-        const rookUserData = await rookUserResponse.json();
-        const rookUserId = rookUserData.rook_user_id;
-        
-        console.log('🔍 Obteniendo métricas de salud para:', { rook_user_id: rookUserId, date: today });
-        
-        // Obtener resumen físico
-        const physicalResponse = await fetch(`/api/users/physical-summary?user_id=${rookUserId}&date=${today}`);
-        const physicalData = await physicalResponse.json();
-        
-        // Obtener resumen de sueño
-        const sleepResponse = await fetch(`/api/users/sleep-summary?user_id=${rookUserId}&date=${today}`);
-        const sleepData = await sleepResponse.json();
-
-        const newDailyMetrics = {
-          steps: physicalData.steps || 0,
-          calories: physicalData.calories || 0,
-          sleep: sleepData.sleep_duration_hours || 0
-        };
-
-        setDailyMetrics(newDailyMetrics);
-
-        // Guardar los datos en daily_activities para validar rachas
-        await saveDailyActivity(userState.userFid, today, newDailyMetrics);
-
-        // Sincronizar challenges activos para el usuario
-        await syncUserChallenges(userState.userFid, today);
-
-        console.log('✅ Métricas de salud actualizadas:', newDailyMetrics);
-      } catch (error) {
-        console.error('❌ Error obteniendo métricas de salud:', error);
-      }
-    };
-
-    if (initialCheckDone && userState.connectedProvider && userState.timezone) {
-      fetchHealthMetrics();
-    }
-  }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone, saveDailyActivity, syncUserChallenges]);
-
-  useEffect(() => {
-    const fetchWeeklyMetrics = async () => {
-      if (!userState.userFid || !userState.connectedProvider || !userState.timezone) return;
+    const fetchOptimizedHealthData = async () => {
+      if (!userState.userFid || !userState.connectedProvider) return;
 
       try {
-        const rookUserResponse = await fetch(`/api/users/get-rook-user?fid=${userState.userFid}`);
-        if (!rookUserResponse.ok) {
-          console.error('❌ Error obteniendo rook_user_id para métricas semanales');
+        console.log('🚀 [OPTIMIZED] Obteniendo datos de salud desde base de datos local para usuario:', userState.userFid);
+        
+        const response = await fetch(`/api/users/health-data?user_fid=${userState.userFid}`);
+        
+        if (!response.ok) {
+          console.error('❌ Error obteniendo datos optimizados:', await response.text());
           return;
         }
-        
-        const rookUserData = await rookUserResponse.json();
-        const rookUserId = rookUserData.rook_user_id;
-        
-        // Obtener la fecha de hoy en la zona horaria del usuario
-        const today = new Date(new Date().toLocaleString('en-US', { timeZone: userState.timezone }));
-        const weeklyData: {
-          calories: { value: number; percentage: number }[];
-          steps: { value: number; percentage: number }[];
-          sleep: { value: number; percentage: number }[];
-        } = {
-          calories: [],
-          steps: [],
-          sleep: []
-        };
 
-        for (let i = 7; i >= 1; i--) {
-          const date = new Date(today);
-          date.setDate(today.getDate() - i);
-          const dateStr = getLocalDateString(date, userState.timezone);
-
-          // Obtener datos físicos
-          const physicalResponse = await fetch(`/api/users/physical-summary?user_id=${rookUserId}&date=${dateStr}`);
-          const physicalData = await physicalResponse.json();
+        const data = await response.json();
+        
+        if (data.success) {
+          // Actualizar métricas diarias
+          setDailyMetrics(data.daily_metrics);
           
-          // Obtener datos de sueño
-          const sleepResponse = await fetch(`/api/users/sleep-summary?user_id=${rookUserId}&date=${dateStr}`);
-          const sleepData = await sleepResponse.json();
+          // Actualizar métricas semanales
+          setWeeklyMetrics(data.weekly_metrics);
+          
+          // Actualizar objetivos del usuario para cálculos
+          setUserGoals(data.user_goals);
 
-          // Calcular porcentajes
-          const caloriesPercentage = Math.min((physicalData.calories / goals.calories) * 100, 100);
-          const stepsPercentage = Math.min((physicalData.steps / goals.steps) * 100, 100);
-          const sleepPercentage = Math.min((sleepData.sleep_duration_hours / goals.sleep) * 100, 100);
+          console.log('✅ [OPTIMIZED] Datos de salud actualizados exitosamente:', {
+            daily: data.daily_metrics,
+            weekly_data_points: data.weekly_metrics.steps.length,
+            goals: data.user_goals,
+            target_date: data.target_date,
+            date_type: data.date_type
+          });
 
-          weeklyData.calories.push({ 
-            value: physicalData.calories || 0,
-            percentage: caloriesPercentage || 0
-          });
-          weeklyData.steps.push({ 
-            value: physicalData.steps || 0,
-            percentage: stepsPercentage || 0
-          });
-          weeklyData.sleep.push({ 
-            value: sleepData.sleep_duration_hours || 0,
-            percentage: sleepPercentage || 0
-          });
+          // ✅ UPDATED: Usar la fecha objetivo (ayer) del API response para sincronización
+          const targetDate = data.target_date || (userState.timezone 
+            ? (() => {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                return getLocalDateString(yesterday, userState.timezone);
+              })()
+            : (() => {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                return yesterday.toISOString().split('T')[0];
+              })()
+          );
+
+          // Sincronizar challenges activos para el usuario con fecha de ayer
+          await syncUserChallenges(userState.userFid, targetDate);
         }
-
-        setWeeklyMetrics(weeklyData);
       } catch (error) {
-        console.error('❌ Error obteniendo métricas semanales:', error);
+        console.error('❌ [OPTIMIZED] Error obteniendo datos optimizados:', error);
       }
     };
 
-    if (initialCheckDone && userState.connectedProvider && userState.timezone) {
-      fetchWeeklyMetrics();
+    if (initialCheckDone && userState.connectedProvider) {
+      fetchOptimizedHealthData();
     }
-  }, [initialCheckDone, userState.userFid, userState.connectedProvider, goals, userState.timezone]);
+  }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone, syncUserChallenges]);
 
   const handleSaveGoals = async (goals: { calories: number; steps: number; sleep: number }) => {
     try {
@@ -427,29 +335,40 @@ export default function DashboardInicial() {
   };
 
   function calculateDailyProgress() {
-    const caloriesProgress = (dailyMetrics.calories / goals.calories) * 100;
-    const stepsProgress = (dailyMetrics.steps / goals.steps) * 100;
-    const sleepProgress = (dailyMetrics.sleep / goals.sleep) * 100;
+    // Usar userGoals de la API optimizada
+    const caloriesProgress = (dailyMetrics.calories / userGoals.calories_goal) * 100;
+    const stepsProgress = (dailyMetrics.steps / userGoals.steps_goal) * 100;
+    const sleepProgress = (dailyMetrics.sleep / userGoals.sleep_hours_goal) * 100;
     
     const averageProgress = Math.round((caloriesProgress + stepsProgress + sleepProgress) / 3);
     return Math.min(averageProgress, 100); // Aseguramos que no exceda el 100%
   }
 
+  // ✅ NEW: Función para verificar si TODOS los objetivos están completados
+  function areAllGoalsCompleted() {
+    const caloriesCompleted = (dailyMetrics.calories / userGoals.calories_goal) >= 1;
+    const stepsCompleted = (dailyMetrics.steps / userGoals.steps_goal) >= 1;
+    const sleepCompleted = (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1;
+    
+    return caloriesCompleted && stepsCompleted && sleepCompleted;
+  }
+
   function getProgressMessage() {
     const progress = calculateDailyProgress();
+    const allGoalsCompleted = areAllGoalsCompleted();
     
-    if (progress === 100) {
-      return "You crushed it! 💥 Daily goal completed — now share that win with the world!";
+    if (allGoalsCompleted) {
+      return "You crushed it yesterday! 💥 All goals completed — share your amazing achievement!";
     } else if (progress >= 86) {
-      return "Final stretch! ⚡ Push through and hit that 100% — you're almost there!";
+      return "So close yesterday! ⚡ You were almost at 100% — keep that momentum going today!";
     } else if (progress >= 61) {
-      return "So close! Keep moving, you're on the edge of greatness.";
+      return "Strong performance yesterday! You're building great habits.";
     } else if (progress >= 41) {
-      return "Solid progress! You've got momentum — keep it going.";
+      return "Good progress yesterday! Every step counts towards your goals.";
     } else if (progress >= 21) {
-      return "Your day is picking up — now's the time to build the habit!";
+      return "Yesterday was a start — today is a new opportunity to do even better! 💪";
     } else {
-      return "Every journey starts with a single step. Let's get moving! 💪";
+      return "Yesterday's behind you — today is a fresh chance to crush your goals! 💪";
     }
   }
 
@@ -460,10 +379,29 @@ export default function DashboardInicial() {
       const imageID = userState.userFid;
       const time = Math.floor(Date.now() / 1000);
       const shareID = `${imageID}-${time}`;
-      const achievementText = `🎉 I completed my daily goals on @livmore!\n\n` +
-        `🔥 Calories: ${dailyMetrics.calories}/${goals.calories}\n` +
-        `👣 Steps: ${dailyMetrics.steps}/${goals.steps}\n` +
-        `😴 Sleep: ${dailyMetrics.sleep}/${goals.sleep}h\n\n` +
+      
+      // ✅ UPDATED: Crear fecha de ayer para el texto
+      const yesterday = userState.timezone ? (() => {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        return yesterdayDate.toLocaleDateString('en-US', { 
+          timeZone: userState.timezone,
+          month: 'short',
+          day: 'numeric'
+        });
+      })() : (() => {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        return yesterdayDate.toLocaleDateString('en-US', { 
+          month: 'short',
+          day: 'numeric'
+        });
+      })();
+
+      const achievementText = `🎉 I completed all my goals yesterday (${yesterday}) on @livmore!\n\n` +
+        `🔥 Calories: ${dailyMetrics.calories}/${userGoals.calories_goal}\n` +
+        `👣 Steps: ${dailyMetrics.steps}/${userGoals.steps_goal}\n` +
+        `😴 Sleep: ${dailyMetrics.sleep}/${userGoals.sleep_hours_goal}h\n\n` +
         `💪 Turn healthy habits into rewards! 🧬`;
       
       const url = `${process.env.NEXT_PUBLIC_URL}/di-daily/${shareID}`;
@@ -477,14 +415,18 @@ export default function DashboardInicial() {
     }
   };
 
-  // Actualizar displays de fecha para usar la zona horaria del usuario
+  // ✅ CORRECTED: Funciones para mostrar semana PREVIA a ayer (no incluyendo ayer)
   function getWeekDateRange() {
     const tz = userState.timezone || 'UTC';
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-    const end = new Date(today);
-    end.setDate(today.getDate() - 1); // ayer
-    const start = new Date(today);
-    start.setDate(today.getDate() - 7); // hace 7 días
+    
+    // La semana termina el día ANTES de ayer
+    const endDay = new Date(today);
+    endDay.setDate(today.getDate() - 2); // día antes de ayer
+    
+    // 6 días antes del último día (total 7 días previos a ayer)
+    const startDay = new Date(endDay);
+    startDay.setDate(endDay.getDate() - 6); 
 
     const formatDate = (date: Date) => date.toLocaleDateString('en-US', {
       timeZone: tz,
@@ -492,7 +434,7 @@ export default function DashboardInicial() {
       day: 'numeric'
     });
 
-    return `${formatDate(start)} - ${formatDate(end)}`;
+    return `${formatDate(startDay)} - ${formatDate(endDay)}`;
   }
 
   function getWeekDays() {
@@ -501,7 +443,8 @@ export default function DashboardInicial() {
     const days = [];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    for (let i = 7; i >= 1; i--) {
+    // Generar días desde 8 días antes hasta 2 días antes (semana previa a ayer)
+    for (let i = 8; i >= 2; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       days.push(dayNames[date.getDay()]);
@@ -575,8 +518,20 @@ export default function DashboardInicial() {
     if (!userState.userFid) return;
     
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/attestations/check-today?user_fid=${userState.userFid}&date=${today}`);
+      // ✅ UPDATED: Usar timezone del usuario para determinar "yesterday"
+      const yesterday = userState.timezone ? (() => {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        return new Intl.DateTimeFormat('en-CA', { timeZone: userState.timezone }).format(yesterdayDate);
+      })() : (() => {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        return yesterdayDate.toISOString().split('T')[0];
+      })();
+        
+      console.log('🕐 [Attestations] Verificando attestations para ayer:', yesterday);
+      
+      const response = await fetch(`/api/attestations/check-today?user_fid=${userState.userFid}&date=${yesterday}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -585,7 +540,7 @@ export default function DashboardInicial() {
     } catch (error) {
       console.error('Error checking existing attestations:', error);
     }
-  }, [userState.userFid]);
+  }, [userState.userFid, userState.timezone]);
 
   useEffect(() => {
     checkExistingAttestations();
@@ -616,12 +571,12 @@ export default function DashboardInicial() {
     setCreatedAttestations(prev => ({ ...prev, [metric]: true }));
   };
 
-  // Function to determine eligible metrics for attestation
+  // ✅ UPDATED: Function to determine eligible metrics for attestation
   const getEligibleMetrics = () => {
     return {
-      calories: (dailyMetrics.calories / goals.calories) >= 1,
-      steps: (dailyMetrics.steps / goals.steps) >= 1,
-      sleep: (dailyMetrics.sleep / goals.sleep) >= 1
+      calories: (dailyMetrics.calories / userGoals.calories_goal) >= 1,
+      steps: (dailyMetrics.steps / userGoals.steps_goal) >= 1,
+      sleep: (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1
     };
   };
 
@@ -691,17 +646,33 @@ export default function DashboardInicial() {
             <div className="flex flex-col items-center justify-center space-y-6 p-2">
               {/* Primera fila: Título */}
               <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
-                Daily Activity
+                Yesterday's Activity
               </h1>
 
-              {/* Segunda fila: Fecha actual */}
+              {/* Segunda fila: Fecha de ayer */}
               <div className={`text-xl text-gray-400 mb-4 ${protoMono.className}`}>
-                {new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                {userState.timezone ? (() => {
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  return yesterday.toLocaleDateString('en-US', { 
+                    timeZone: userState.timezone,
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  });
+                })() :
+                (() => {
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  return yesterday.toLocaleDateString('en-US', { 
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  });
+                })()
+                }
               </div>
 
               {/* Tercera fila: Métricas con íconos */}
@@ -811,15 +782,15 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-              {/* Cuarta fila: Progreso Diario */}
+              {/* Cuarta fila: Progreso de Ayer */}
               <div className="mt-2 w-full mb-0 max-w-4xl">
                 <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
                   <p className={`text-lg mb-0 font-bold text-white`}>
-                    Daily Progress: {calculateDailyProgress()}%
+                    Yesterday's Progress: {calculateDailyProgress()}%
                   </p>
                   <p className={`text-base text-gray-300`}>
                     {getProgressMessage()}
-                    {calculateDailyProgress() === 100 && (
+                    {areAllGoalsCompleted() && (
                       <span 
                         onClick={handleShare}
                         className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
@@ -831,18 +802,20 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-              {/* Mint Attestations Section - Only show if at least one goal is met */}
-              {(['calories', 'steps', 'sleep'] as const).some(metric => 
-                (dailyMetrics[metric] / goals[metric]) >= 1
+              {/* Mint Attestations Section - Show if at least one goal is completed */}
+              {(
+                (dailyMetrics.calories / userGoals.calories_goal) >= 1 ||
+                (dailyMetrics.steps / userGoals.steps_goal) >= 1 ||
+                (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1
               ) && (
                 <div className="w-full max-w-4xl space-y-4 mb-0">
                   <div className={`text-center space-y-4 ${protoMono.className}`}>
                     <div>
                       <p className={`text-lg mb-2 font-bold text-white`}>
-                        Congratulations, you did it! 🎉
+                        Great performance yesterday! 🎉
                       </p>
                       <p className={`text-base text-gray-300 mb-4`}>
-                        You have achieved your daily goals. Mint an attestation to prove your achievement onchain.
+                        You achieved some of your goals yesterday. Mint attestations for your completed achievements onchain.
                       </p>
                     </div>
                     
@@ -851,7 +824,7 @@ export default function DashboardInicial() {
                       className="w-full max-w-md mx-auto py-3 px-6 rounded-xl border-2 border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300 ease-in-out transform hover:scale-105"
                     >
                       <span className={`text-lg font-bold text-[#00FF94] ${protoMono.className}`}>
-                        🏆 Mint Attestations
+                        🏆 Mint Completed Achievements
                       </span>
                     </button>
                   </div>

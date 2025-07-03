@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get monthly leaderboard for specific month/year
+    // ✅ CORRECTED: Get monthly leaderboard using whitelist_users instead of livmore
     let result;
     
     if (metric === 'steps') {
@@ -35,13 +35,13 @@ export async function GET(request: NextRequest) {
           u.username,
           u.display_name,
           SUM(da.steps) as monthly_steps,
-          COUNT(da.date) as active_days_in_month,
+          COUNT(da.activity_date) as active_days_in_month,
           AVG(da.steps) as avg_daily_steps
-        FROM daily_activities da
-        JOIN livmore u ON da.user_fid = u.user_fid
+        FROM v2_daily_activities da
+        JOIN whitelist_users u ON da.user_fid = u.user_fid
         WHERE 
-          EXTRACT(YEAR FROM da.date) = ${year}
-          AND EXTRACT(MONTH FROM da.date) = ${month}
+          EXTRACT(YEAR FROM da.activity_date) = ${year}
+          AND EXTRACT(MONTH FROM da.activity_date) = ${month}
           AND da.steps > 0
         GROUP BY da.user_fid, u.username, u.display_name
         HAVING SUM(da.steps) > 0
@@ -55,13 +55,13 @@ export async function GET(request: NextRequest) {
           u.username,
           u.display_name,
           SUM(da.calories) as monthly_calories,
-          COUNT(da.date) as active_days_in_month,
+          COUNT(da.activity_date) as active_days_in_month,
           AVG(da.calories) as avg_daily_calories
-        FROM daily_activities da
-        JOIN livmore u ON da.user_fid = u.user_fid
+        FROM v2_daily_activities da
+        JOIN whitelist_users u ON da.user_fid = u.user_fid
         WHERE 
-          EXTRACT(YEAR FROM da.date) = ${year}
-          AND EXTRACT(MONTH FROM da.date) = ${month}
+          EXTRACT(YEAR FROM da.activity_date) = ${year}
+          AND EXTRACT(MONTH FROM da.activity_date) = ${month}
           AND da.calories > 0
         GROUP BY da.user_fid, u.username, u.display_name
         HAVING SUM(da.calories) > 0
@@ -93,7 +93,8 @@ export async function GET(request: NextRequest) {
       year,
       month,
       month_name: monthNames[month - 1],
-      total_users: leaderboard.length
+      total_users: leaderboard.length,
+      data_source: 'v2_daily_activities + whitelist_users' // ✅ UPDATED: Indicar tabla corregida
     });
 
   } catch (error) {

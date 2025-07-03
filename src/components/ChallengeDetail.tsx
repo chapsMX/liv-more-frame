@@ -200,26 +200,37 @@ export default function ChallengeDetail() {
             // If user is joined, trigger sync of activity data
             if (isJoined && userState.userFid) {
               const startDate = new Date(data.challenge.start_date);
-              const endDate = new Date();
-              endDate.setDate(startDate.getDate() + data.challenge.duration_days - 1);
+              const challengeEndDate = new Date(startDate);
+              challengeEndDate.setDate(startDate.getDate() + data.challenge.duration_days - 1);
+              
+              const today = new Date();
+              const syncEndDate = challengeEndDate > today ? today : challengeEndDate;
 
-              try {
-                const syncRes = await fetch('/api/challenges/sync-history', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    user_fid: userState.userFid,
-                    challenge_id: challengeId,
-                    start_date: startDate.toISOString().split('T')[0],
-                    end_date: endDate.toISOString().split('T')[0]
-                  })
-                });
-                
-                if (!syncRes.ok) {
-                  console.error('Error syncing challenge history:', await syncRes.text());
+              if (startDate <= today) {
+                try {
+                  console.log('🔄 [Sync] Syncing challenge data from', startDate.toISOString().split('T')[0], 'to', syncEndDate.toISOString().split('T')[0]);
+                  
+                  const syncRes = await fetch('/api/challenges/sync-history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      user_fid: userState.userFid,
+                      challenge_id: challengeId,
+                      start_date: startDate.toISOString().split('T')[0],
+                      end_date: syncEndDate.toISOString().split('T')[0]
+                    })
+                  });
+                  
+                  if (!syncRes.ok) {
+                    console.error('Error syncing challenge history:', await syncRes.text());
+                  } else {
+                    console.log('✅ [Sync] Challenge history synchronized successfully');
+                  }
+                } catch (syncError) {
+                  console.error('Error triggering sync:', syncError);
                 }
-              } catch (syncError) {
-                console.error('Error triggering sync:', syncError);
+              } else {
+                console.log('⚠️ [Sync] Challenge hasn\'t started yet, skipping sync');
               }
             }
           } else {

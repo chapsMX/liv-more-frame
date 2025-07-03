@@ -20,14 +20,30 @@ export async function POST(request: Request) {
     // Fechas a sincronizar
     const start = new Date(start_date);
     const end = new Date(end_date);
+    // ✅ SAFETY: Prevenir sincronización de fechas futuras
+    const today = new Date();
+    const maxSyncDate = end > today ? today : end;
+    
+    console.log('🔄 [Sync History] Syncing from', start_date, 'to', maxSyncDate.toISOString().split('T')[0]);
+    
     let synced = 0;
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(start); d <= maxSyncDate; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
+      
+      // ✅ EXTRA SAFETY: Skip future dates
+      if (new Date(dateStr) > today) {
+        console.log('⚠️ [Sync History] Skipping future date:', dateStr);
+        break;
+      }
+      
       // ¿Ya existe registro?
       const exists = await sql`
         SELECT id FROM challenge_daily_activity WHERE challenge_id = ${challenge_id} AND user_fid = ${user_fid} AND date = ${dateStr}
       `;
       if (exists.length > 0) continue;
+      
+      console.log('📅 [Sync History] Processing date:', dateStr);
+      
       // Obtener datos de Rook
       const physicalRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/users/physical-summary?user_id=${rook_user_id}&date=${dateStr}`);
       const physical = await physicalRes.json();
@@ -40,6 +56,8 @@ export async function POST(request: Request) {
       `;
       synced++;
     }
+    
+    console.log('✅ [Sync History] Completed. Records synced:', synced);
     return NextResponse.json({ success: true, synced });
   } catch (error) {
     console.error('Error syncing challenge history:', error);

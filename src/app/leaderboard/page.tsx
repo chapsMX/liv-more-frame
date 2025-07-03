@@ -12,12 +12,20 @@ interface PersonalRecord {
   max_calories: number;
   max_steps_date: string | null;
   max_calories_date: string | null;
-  daily_steps: number;
-  daily_calories: number;
+  yesterday_steps: number;
+  yesterday_calories: number;
+  yesterday_sleep: number;
   weekly_steps: number;
   weekly_calories: number;
   monthly_steps: number;
   monthly_calories: number;
+  // ✅ NEW: Sleep fields
+  weekly_avg_sleep: number;
+  weekly_max_sleep: number;
+  monthly_avg_sleep: number;
+  monthly_max_sleep: number;
+  max_sleep: number;
+  max_sleep_date: string | null;
 }
 
 interface LeaderboardEntry {
@@ -31,6 +39,12 @@ interface LeaderboardEntry {
   active_days_in_month?: number;
   daily_average?: number;
   metric: string;
+  avg_sleep_hours?: number;
+  good_sleep_days?: number;
+  consistency_score?: number;
+  best_sleep?: number;
+  worst_sleep?: number;
+  best_sleep_date?: string;
 }
 
 interface UserProfile {
@@ -60,12 +74,13 @@ export default function LeaderboardPage() {
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord | null>(null);
   const [topLeaderboard, setTopLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [monthlyLeaderboard, setMonthlyLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [sleepLeaderboard, setSleepLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<number, UserProfile>>(new Map());
   const [availableMonths, setAvailableMonths] = useState<AvailableMonth[]>([]);
   
   // UI States
   const [activeTab, setActiveTab] = useState<'top' | 'monthly'>('top');
-  const [selectedMetric, setSelectedMetric] = useState<'steps' | 'calories'>('steps');
+  const [selectedMetric, setSelectedMetric] = useState<'steps' | 'calories' | 'sleep'>('steps');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   
@@ -125,11 +140,22 @@ export default function LeaderboardPage() {
   const fetchTopLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
     try {
-      const response = await fetch(`/api/leaderboard/top?metric=${selectedMetric}&limit=1000`);
+      let response;
+      if (selectedMetric === 'sleep') {
+        // Sleep leaderboard uses different endpoint with mode parameter
+        response = await fetch(`/api/leaderboard/sleep?mode=best_single_day&limit=1000`);
+      } else {
+        response = await fetch(`/api/leaderboard/top?metric=${selectedMetric}&limit=1000`);
+      }
+      
       const data = await response.json();
       
       if (response.ok) {
-        setTopLeaderboard(data.leaderboard);
+        if (selectedMetric === 'sleep') {
+          setTopLeaderboard(data.leaderboard);
+        } else {
+          setTopLeaderboard(data.leaderboard);
+        }
         
         // Fetch profiles for users in leaderboard - convert to numbers
         const userFids = data.leaderboard.map((entry: LeaderboardEntry) => Number(entry.user_fid));
@@ -148,7 +174,14 @@ export default function LeaderboardPage() {
   const fetchMonthlyLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
     try {
-      const response = await fetch(`/api/leaderboard/monthly?metric=${selectedMetric}&year=${selectedYear}&month=${selectedMonth}&limit=1000`);
+      let response;
+      if (selectedMetric === 'sleep') {
+        // Sleep leaderboard uses different endpoint with monthly mode
+        response = await fetch(`/api/leaderboard/sleep?mode=monthly&year=${selectedYear}&month=${selectedMonth}&limit=1000`);
+      } else {
+        response = await fetch(`/api/leaderboard/monthly?metric=${selectedMetric}&year=${selectedYear}&month=${selectedMonth}&limit=1000`);
+      }
+      
       const data = await response.json();
       
       if (response.ok) {
@@ -241,8 +274,6 @@ export default function LeaderboardPage() {
     return num.toLocaleString();
   };
 
-
-
   // Render leaderboard table
   const renderLeaderboardTable = (leaderboard: LeaderboardEntry[]) => {
     if (leaderboard.length === 0) {
@@ -262,7 +293,27 @@ export default function LeaderboardPage() {
           {leaderboard.map((entry) => {
             const profile = userProfiles.get(Number(entry.user_fid));
             const isCurrentUser = Number(entry.user_fid) === userState.userFid;
-            const total = entry.total || entry.monthly_total || 0;
+            
+            // ✅ UPDATED: Handle different data formats for sleep vs other metrics
+            let displayValue = '';
+            let displayUnit = '';
+            
+            if (selectedMetric === 'sleep') {
+              if (activeTab === 'top') {
+                // Best single day sleep
+                displayValue = entry.best_sleep ? entry.best_sleep.toFixed(1) : '0';
+                displayUnit = 'h';
+              } else {
+                // Monthly sleep average
+                displayValue = entry.avg_sleep_hours ? entry.avg_sleep_hours.toFixed(1) : '0';
+                displayUnit = 'h avg';
+              }
+            } else {
+              // Steps or calories
+              const total = entry.total || entry.monthly_total || 0;
+              displayValue = formatNumber(total);
+              displayUnit = '';
+            }
             
             return (
               <div
@@ -328,7 +379,7 @@ export default function LeaderboardPage() {
                   <span className={`text-sm font-bold ${protoMono.className} ${
                     isCurrentUser ? 'text-violet-400' : 'text-white'
                   }`}>
-                    {formatNumber(total)}
+                    {displayValue}{displayUnit}
                   </span>
                 </div>
               </div>
@@ -413,26 +464,52 @@ export default function LeaderboardPage() {
               <div className={`text-white ${protoMono.className}`}>
                 <div className="font-bold mb-1">Steps:</div>
                 <div className="text-sm text-gray-300">
-                  Day: {formatNumber(personalRecords.daily_steps || 0)} steps
+                  Best Day: {formatNumber(personalRecords.max_steps || 0)} steps
+                  {personalRecords.max_steps_date && ` (${new Date(personalRecords.max_steps_date).toLocaleDateString()})`}
                 </div>
                 <div className="text-sm text-gray-300">
-                  Week: {formatNumber(personalRecords.weekly_steps || 0)} steps
+                  Best Week: {formatNumber(personalRecords.weekly_steps || 0)} steps
                 </div>
                 <div className="text-sm text-gray-300">
-                  Month: {formatNumber(personalRecords.monthly_steps || 0)} steps
+                  Best Month: {formatNumber(personalRecords.monthly_steps || 0)} steps
                 </div>
               </div>
               
               <div className={`text-white ${protoMono.className}`}>
                 <div className="font-bold mb-1">Calories:</div>
                 <div className="text-sm text-gray-300">
-                  Day: {formatNumber(personalRecords.daily_calories || 0)} calories
+                  Best Day: {formatNumber(personalRecords.max_calories || 0)} calories
+                  {personalRecords.max_calories_date && ` (${new Date(personalRecords.max_calories_date).toLocaleDateString()})`}
                 </div>
                 <div className="text-sm text-gray-300">
-                  Week: {formatNumber(personalRecords.weekly_calories || 0)} calories
+                  Best Week: {formatNumber(personalRecords.weekly_calories || 0)} calories
                 </div>
                 <div className="text-sm text-gray-300">
-                  Month: {formatNumber(personalRecords.monthly_calories || 0)} calories
+                  Best Month: {formatNumber(personalRecords.monthly_calories || 0)} calories
+                </div>
+              </div>
+
+              {/* ✅ NEW: Sleep Personal Records */}
+              <div className={`text-white ${protoMono.className}`}>
+                <div className="font-bold mb-1">Sleep:</div>
+                <div className="text-sm text-gray-300">
+                  Yesterday: {personalRecords.yesterday_sleep ? `${personalRecords.yesterday_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week Avg: {personalRecords.weekly_avg_sleep ? `${personalRecords.weekly_avg_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week Max: {personalRecords.weekly_max_sleep ? `${personalRecords.weekly_max_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month Avg: {personalRecords.monthly_avg_sleep ? `${personalRecords.monthly_avg_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month Max: {personalRecords.monthly_max_sleep ? `${personalRecords.monthly_max_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  All-Time Max: {personalRecords.max_sleep ? `${personalRecords.max_sleep}h` : 'No data'}
+                  {personalRecords.max_sleep_date && ` (${new Date(personalRecords.max_sleep_date).toLocaleDateString()})`}
                 </div>
               </div>
             </div>
@@ -489,6 +566,17 @@ export default function LeaderboardPage() {
             >
               🔥 Calories
             </button>
+            {/* ✅ NEW: Sleep button */}
+            <button
+              onClick={() => setSelectedMetric('sleep')}
+              className={`flex-1 py-2 px-4 rounded-md transition-all duration-200 ${protoMono.className} ${
+                selectedMetric === 'sleep'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              😴 Sleep
+            </button>
           </div>
 
           {/* Month Filter (only for monthly tab) */}
@@ -518,8 +606,18 @@ export default function LeaderboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className={`text-lg font-bold text-white ${protoMono.className}`}>
               {activeTab === 'top' 
-                ? `Most ${selectedMetric === 'steps' ? 'Steps' : 'Calories'} in a Single Day (All Time)` 
-                : `${selectedMetric === 'steps' ? 'Steps' : 'Calories'} - ${availableMonths.find(m => m.year === selectedYear && m.month === selectedMonth)?.display_name || 'Current Month'}`
+                ? (() => {
+                    if (selectedMetric === 'steps') return 'Most Steps in a Single Day (All Time)';
+                    if (selectedMetric === 'calories') return 'Most Calories in a Single Day (All Time)';
+                    if (selectedMetric === 'sleep') return 'Best Single Night Sleep (All Time)';
+                    return 'Single Day Records';
+                  })()
+                : (() => {
+                    if (selectedMetric === 'steps') return `Steps - ${availableMonths.find(m => m.year === selectedYear && m.month === selectedMonth)?.display_name || 'Current Month'}`;
+                    if (selectedMetric === 'calories') return `Calories - ${availableMonths.find(m => m.year === selectedYear && m.month === selectedMonth)?.display_name || 'Current Month'}`;
+                    if (selectedMetric === 'sleep') return `Sleep Average - ${availableMonths.find(m => m.year === selectedYear && m.month === selectedMonth)?.display_name || 'Current Month'}`;
+                    return 'Monthly Leaderboard';
+                  })()
               }
             </h2>
             {leaderboardLoading && (

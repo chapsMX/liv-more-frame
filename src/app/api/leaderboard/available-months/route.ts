@@ -5,16 +5,16 @@ const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET() {
   try {
-    // Get all available months/years with activity data
+    // ✅ MIGRATED: Get all available months/years with activity data from v2_daily_activities
     const result = await sql`
       SELECT 
-        EXTRACT(YEAR FROM date) as year,
-        EXTRACT(MONTH FROM date) as month,
+        EXTRACT(YEAR FROM activity_date) as year,
+        EXTRACT(MONTH FROM activity_date) as month,
         COUNT(DISTINCT user_fid) as user_count,
         COUNT(*) as activity_count
-      FROM daily_activities 
+      FROM v2_daily_activities 
       WHERE steps > 0 OR calories > 0
-      GROUP BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date)
+      GROUP BY EXTRACT(YEAR FROM activity_date), EXTRACT(MONTH FROM activity_date)
       ORDER BY year DESC, month DESC
     `;
     
@@ -34,7 +34,8 @@ export async function GET() {
 
     return NextResponse.json({
       available_months: availableMonths,
-      total_periods: availableMonths.length
+      total_periods: availableMonths.length,
+      data_source: 'v2_daily_activities' // ✅ NEW: Indicar fuente de datos
     });
 
   } catch (error) {

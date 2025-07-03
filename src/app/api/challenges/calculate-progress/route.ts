@@ -74,6 +74,8 @@ export async function POST(request: Request) {
           ORDER BY date
         `;
 
+        console.log(`📊 [Progress] Found ${activityResult.length} activity records for user ${participantFid}`);
+
         let progress = 0;
         const activityField = getActivityField(challenge.activity_type);
 
@@ -82,26 +84,39 @@ export async function POST(request: Request) {
           progress = activityResult.reduce((sum, day) => {
             return sum + (day[activityField] || 0);
           }, 0);
-        } else if (challenge.objective_type === 'daily_goal') {
-          // Contar días que cumplieron el objetivo diario
+        } else if (challenge.objective_type === 'daily_goal' || challenge.objective_type === 'daily_minimum') {
+          // ✅ FIXED: Contar días que cumplieron el objetivo diario (daily_goal o daily_minimum)
           progress = activityResult.filter(day => {
             return (day[activityField] || 0) >= challenge.goal_amount;
           }).length;
+          console.log(`📈 [Progress] Days meeting goal (${challenge.goal_amount}): ${progress}/${activityResult.length}`);
         }
 
         // Verificar si completó el challenge
         const isCompleted = progress >= challenge.goal_amount;
         const wasAlreadyCompleted = participant.has_completed;
 
-        // Actualizar progreso en la base de datos
-        await sql`
-          UPDATE challenge_participants
-          SET 
-            current_progress = ${progress},
-            has_completed = ${isCompleted},
-            completed_at = ${isCompleted && !wasAlreadyCompleted ? 'CURRENT_TIMESTAMP' : 'completed_at'}
-          WHERE challenge_id = ${challenge_id} AND user_fid = ${participantFid}
-        `;
+        // ✅ FIXED: Actualizar progreso en la base de datos
+        if (isCompleted && !wasAlreadyCompleted) {
+          // Acaba de completar el challenge - actualizar completed_at
+          await sql`
+            UPDATE challenge_participants
+            SET 
+              current_progress = ${progress},
+              has_completed = ${isCompleted},
+              completed_at = CURRENT_TIMESTAMP
+            WHERE challenge_id = ${challenge_id} AND user_fid = ${participantFid}
+          `;
+        } else {
+          // Ya estaba completado o aún no completa - no actualizar completed_at
+          await sql`
+            UPDATE challenge_participants
+            SET 
+              current_progress = ${progress},
+              has_completed = ${isCompleted}
+            WHERE challenge_id = ${challenge_id} AND user_fid = ${participantFid}
+          `;
+        }
 
         // Si acaba de completar el challenge, otorgar badge
         if (isCompleted && !wasAlreadyCompleted && challenge.badge_id) {

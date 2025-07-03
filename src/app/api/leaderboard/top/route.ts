@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get top users by single-day maximum activity
+    // ✅ CORRECTED: Get top users using whitelist_users instead of livmore
     let result;
     
     if (metric === 'steps') {
@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
           u.username,
           u.display_name,
           MAX(da.steps) as max_steps,
-          COUNT(da.date) as active_days,
-          (SELECT date FROM daily_activities WHERE user_fid = da.user_fid AND steps = MAX(da.steps) LIMIT 1) as max_date
-        FROM daily_activities da
-        JOIN livmore u ON da.user_fid = u.user_fid
+          COUNT(da.activity_date) as active_days,
+          (SELECT activity_date FROM v2_daily_activities WHERE user_fid = da.user_fid AND steps = MAX(da.steps) LIMIT 1) as max_date
+        FROM v2_daily_activities da
+        JOIN whitelist_users u ON da.user_fid = u.user_fid
         WHERE da.steps > 0
         GROUP BY da.user_fid, u.username, u.display_name
         HAVING MAX(da.steps) > 0
@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
           u.username,
           u.display_name,
           MAX(da.calories) as max_calories,
-          COUNT(da.date) as active_days,
-          (SELECT date FROM daily_activities WHERE user_fid = da.user_fid AND calories = MAX(da.calories) LIMIT 1) as max_date
-        FROM daily_activities da
-        JOIN livmore u ON da.user_fid = u.user_fid
+          COUNT(da.activity_date) as active_days,
+          (SELECT activity_date FROM v2_daily_activities WHERE user_fid = da.user_fid AND calories = MAX(da.calories) LIMIT 1) as max_date
+        FROM v2_daily_activities da
+        JOIN whitelist_users u ON da.user_fid = u.user_fid
         WHERE da.calories > 0
         GROUP BY da.user_fid, u.username, u.display_name
         HAVING MAX(da.calories) > 0
@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       leaderboard,
       metric,
-      total_users: leaderboard.length
+      total_users: leaderboard.length,
+      data_source: 'v2_daily_activities + whitelist_users' // ✅ UPDATED: Indicar tabla corregida
     });
 
   } catch (error) {

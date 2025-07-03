@@ -1,6 +1,6 @@
 import { http, createConfig } from 'wagmi'
 import { base } from 'wagmi/chains'
-import { farcasterFrame as miniAppConnector } from '@farcaster/frame-wagmi-connector'
+import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector'
 import { metaMask, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
 export const config = createConfig({
@@ -9,7 +9,7 @@ export const config = createConfig({
     [base.id]: http(),
   },
   connectors: [
-    miniAppConnector(),
+    farcasterMiniApp(),
     metaMask(),
     coinbaseWallet({
       appName: 'LivMore',
@@ -27,7 +27,6 @@ export const config = createConfig({
   ]
 })
 
-// TypeScript module augmentation for better type safety
 declare module 'wagmi' {
   interface Register {
     config: typeof config

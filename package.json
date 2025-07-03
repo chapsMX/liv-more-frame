@@ -9,27 +9,28 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@auth/core": "0.34.2",
+    "@auth/core": "^0.34.2",
     "@coinbase/wallet-sdk": "^4.3.4",
     "@ethereum-attestation-service/eas-sdk": "^2.7.0",
-    "@farcaster/auth-client": "^0.5.0",
-    "@farcaster/auth-kit": "^0.7.0",
-    "@farcaster/frame-sdk": "^0.0.63",
-    "@farcaster/frame-wagmi-connector": "^0.0.52",
-    "@neondatabase/serverless": "^0.10.4",
-    "@neynar/nodejs-sdk": "^2.19.0",
-    "@tanstack/react-query": "^5.80.6",
+    "@farcaster/auth-client": "^0.7.0",
+    "@farcaster/auth-kit": "^0.8.1",
+    "@farcaster/frame-sdk": "^0.1.2",
+    "@farcaster/miniapp-sdk": "^0.1.2",
+    "@farcaster/miniapp-wagmi-connector": "^1.0.0",
+    "@neondatabase/serverless": "^1.0.1",
+    "@neynar/nodejs-sdk": "^3.20.0",
+    "@tanstack/react-query": "^5.81.5",
     "@vercel/analytics": "^1.5.0",
     "@vercel/edge-config": "^1.4.0",
     "@wagmi/connectors": "^5.8.5",
-    "@walletconnect/ethereum-provider": "^2.21.3",
+    "@walletconnect/ethereum-provider": "^2.21.4",
     "clsx": "^2.1.1",
     "ethers": "^6.14.4",
-    "next": "^15.3.2",
+    "next": "^15.3.4",
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "viem": "^2.31.3",
+    "viem": "^2.31.6",
     "wagmi": "^2.15.6"
   },
   "devDependencies": {
@@ -38,10 +39,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^9.30.1",
     "eslint-config-next": "15.2.1",
     "pino-pretty": "^13.0.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5.8.3"
   }
 }

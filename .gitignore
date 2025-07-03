@@ -45,3 +45,4 @@ next-env.d.ts
 db-structure.json
 init.sql
 .cursor/scratchpad.md
+.cursor/
