@@ -229,7 +229,7 @@ async function getUserFidFromRookId(rookUserId: string): Promise<string | null> 
   try {
     const result = await sql`
       SELECT user_fid 
-      FROM user_connections 
+      FROM rook_connection 
       WHERE rook_user_id = ${rookUserId}
       LIMIT 1
     `;
