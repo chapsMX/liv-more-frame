@@ -16,39 +16,53 @@ export async function GET(request: Request) {
       );
     }
 
-    let query = `
-      SELECT 
-        id,
-        name,
-        display_name,
-        wallet,
-        metric_type,
-        goal_value,
-        actual_value,
-        timestamp,
-        challenge_id,
-        title,
-        description,
-        image_url,
-        attestation_uid,
-        created_at
-      FROM user_attestations
-      WHERE user_fid = $1
-    `;
+    console.log('Fetching attestations for user:', userFid, 'metric:', metricType);
 
-    const queryParams: (string | number)[] = [userFid];
-
+    let result;
+    
     if (metricType && metricType !== 'all') {
-      query += ` AND metric_type = $2`;
-      queryParams.push(metricType);
+      result = await sql`
+        SELECT 
+          id,
+          name,
+          display_name,
+          wallet,
+          metric_type,
+          goal_value,
+          actual_value,
+          timestamp,
+          challenge_id,
+          title,
+          description,
+          image_url,
+          attestation_uid,
+          created_at
+        FROM user_attestations
+        WHERE user_fid = ${userFid} AND metric_type = ${metricType}
+        ORDER BY created_at DESC
+      `;
+    } else {
+      result = await sql`
+        SELECT 
+          id,
+          name,
+          display_name,
+          wallet,
+          metric_type,
+          goal_value,
+          actual_value,
+          timestamp,
+          challenge_id,
+          title,
+          description,
+          image_url,
+          attestation_uid,
+          created_at
+        FROM user_attestations
+        WHERE user_fid = ${userFid}
+        ORDER BY created_at DESC
+      `;
     }
-
-    query += ` ORDER BY created_at DESC`;
-
-    console.log('Executing query:', query);
-    console.log('With params:', queryParams);
-
-    const result = await sql(query, queryParams);
     console.log('Query result:', result);
 
     if (!result || result.length === 0) {

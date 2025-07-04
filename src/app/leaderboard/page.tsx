@@ -74,7 +74,6 @@ export default function LeaderboardPage() {
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord | null>(null);
   const [topLeaderboard, setTopLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [monthlyLeaderboard, setMonthlyLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [sleepLeaderboard, setSleepLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<number, UserProfile>>(new Map());
   const [availableMonths, setAvailableMonths] = useState<AvailableMonth[]>([]);
   
@@ -454,68 +453,6 @@ export default function LeaderboardPage() {
 
         <div className="w-full mx-auto">{/* Wrapper for content */}
 
-        {/* Personal Records Section */}
-        {personalRecords && (
-          <div className="mb-4 p-4 bg-gray-900 rounded-xl border-2 border-gray-700">
-            <h2 className={`text-xl font-bold text-white mb-4 ${protoMono.className}`}>
-              Your Personal Records
-            </h2>
-            <div className="space-y-3">
-              <div className={`text-white ${protoMono.className}`}>
-                <div className="font-bold mb-1">Steps:</div>
-                <div className="text-sm text-gray-300">
-                  Best Day: {formatNumber(personalRecords.max_steps || 0)} steps
-                  {personalRecords.max_steps_date && ` (${new Date(personalRecords.max_steps_date).toLocaleDateString()})`}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Week: {formatNumber(personalRecords.weekly_steps || 0)} steps
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Month: {formatNumber(personalRecords.monthly_steps || 0)} steps
-                </div>
-              </div>
-              
-              <div className={`text-white ${protoMono.className}`}>
-                <div className="font-bold mb-1">Calories:</div>
-                <div className="text-sm text-gray-300">
-                  Best Day: {formatNumber(personalRecords.max_calories || 0)} calories
-                  {personalRecords.max_calories_date && ` (${new Date(personalRecords.max_calories_date).toLocaleDateString()})`}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Week: {formatNumber(personalRecords.weekly_calories || 0)} calories
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Month: {formatNumber(personalRecords.monthly_calories || 0)} calories
-                </div>
-              </div>
-
-              {/* ✅ NEW: Sleep Personal Records */}
-              <div className={`text-white ${protoMono.className}`}>
-                <div className="font-bold mb-1">Sleep:</div>
-                <div className="text-sm text-gray-300">
-                  Yesterday: {personalRecords.yesterday_sleep ? `${personalRecords.yesterday_sleep}h` : 'No data'}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Week Avg: {personalRecords.weekly_avg_sleep ? `${personalRecords.weekly_avg_sleep}h` : 'No data'}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Week Max: {personalRecords.weekly_max_sleep ? `${personalRecords.weekly_max_sleep}h` : 'No data'}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Month Avg: {personalRecords.monthly_avg_sleep ? `${personalRecords.monthly_avg_sleep}h` : 'No data'}
-                </div>
-                <div className="text-sm text-gray-300">
-                  Best Month Max: {personalRecords.monthly_max_sleep ? `${personalRecords.monthly_max_sleep}h` : 'No data'}
-                </div>
-                <div className="text-sm text-gray-300">
-                  All-Time Max: {personalRecords.max_sleep ? `${personalRecords.max_sleep}h` : 'No data'}
-                  {personalRecords.max_sleep_date && ` (${new Date(personalRecords.max_sleep_date).toLocaleDateString()})`}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Leaderboard Tabs */}
         <div className="mb-3">
           <div className="flex space-x-1 bg-gray-800 p-1 rounded-lg">
@@ -634,6 +571,68 @@ export default function LeaderboardPage() {
             renderLeaderboardTable(activeTab === 'top' ? topLeaderboard : monthlyLeaderboard)
           )}
         </div>
+        <br/>
+                {/* Personal Records Section */}
+                {personalRecords && (
+          <div className="mb-4 p-4 bg-gray-900 rounded-xl border-2 border-gray-700">
+            <h2 className={`text-xl font-bold text-white mb-4 ${protoMono.className}`}>
+              Your Personal Records
+            </h2>
+            <div className="space-y-3">
+              <div className={`text-white ${protoMono.className}`}>
+                <div className="font-bold mb-1">Steps:</div>
+                <div className="text-sm text-gray-300">
+                  Best Day: {formatNumber(personalRecords.max_steps || 0)} steps
+                  {personalRecords.max_steps_date && ` (${new Date(personalRecords.max_steps_date).toLocaleDateString()})`}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week: {formatNumber(personalRecords.weekly_steps || 0)} steps
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month: {formatNumber(personalRecords.monthly_steps || 0)} steps
+                </div>
+              </div>
+              
+              <div className={`text-white ${protoMono.className}`}>
+                <div className="font-bold mb-1">Calories:</div>
+                <div className="text-sm text-gray-300">
+                  Best Day: {formatNumber(personalRecords.max_calories || 0)} calories
+                  {personalRecords.max_calories_date && ` (${new Date(personalRecords.max_calories_date).toLocaleDateString()})`}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week: {formatNumber(personalRecords.weekly_calories || 0)} calories
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month: {formatNumber(personalRecords.monthly_calories || 0)} calories
+                </div>
+              </div>
+
+              {/* ✅ NEW: Sleep Personal Records */}
+              <div className={`text-white ${protoMono.className}`}>
+                <div className="font-bold mb-1">Sleep:</div>
+                <div className="text-sm text-gray-300">
+                  Yesterday: {personalRecords.yesterday_sleep ? `${personalRecords.yesterday_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week Avg: {personalRecords.weekly_avg_sleep ? `${personalRecords.weekly_avg_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Week Max: {personalRecords.weekly_max_sleep ? `${personalRecords.weekly_max_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month Avg: {personalRecords.monthly_avg_sleep ? `${personalRecords.monthly_avg_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  Best Month Max: {personalRecords.monthly_max_sleep ? `${personalRecords.monthly_max_sleep}h` : 'No data'}
+                </div>
+                <div className="text-sm text-gray-300">
+                  All-Time Max: {personalRecords.max_sleep ? `${personalRecords.max_sleep}h` : 'No data'}
+                  {personalRecords.max_sleep_date && ` (${new Date(personalRecords.max_sleep_date).toLocaleDateString()})`}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         </div>{/* Close wrapper div */}
       </div>
     </div>

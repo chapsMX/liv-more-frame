@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import sdk, {
-AddMiniApp,
-type Context,
-} from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/frame-sdk";
 import { useRouter } from 'next/navigation';
+
+interface SDKContext {
+  user?: {
+    fid: number;
+    username?: string;
+    pfpUrl?: string;
+  };
+  client: {
+    added: boolean;
+  };
+}
 
 import { Boton } from "../styles/ui/boton";
 import { protoMono } from '../styles/fonts';
@@ -19,7 +27,7 @@ export default function LivMore() {
   const router = useRouter();
   const { userState, setUserState } = useUser();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [context, setContext] = useState<Context.FrameContext>();
+  const [context, setContext] = useState<SDKContext>();
   const [added, setAdded] = useState(false);
   const [addFrameResult, setAddFrameResult] = useState("");
   const [whitelistInfo, setWhitelistInfo] = useState("");
@@ -116,63 +124,50 @@ export default function LivMore() {
         }, 1000);
 
         // Añadir el frame
-        const result = await sdk.actions.addFrame();
-        if (result.notificationDetails) {
-          setAddFrameResult(
-            `✅ Frame added successfully\n` +
-            `🔔 Token: ${result.notificationDetails.token}\n` +
-            `🔗 URL: ${result.notificationDetails.url}`
-          );
+        try {
+          const result = await sdk.actions.addFrame();
+          if (result.notificationDetails) {
+            setAddFrameResult(
+              `✅ Frame added successfully\n` +
+              `🔔 Token: ${result.notificationDetails.token}\n` +
+              `🔗 URL: ${result.notificationDetails.url}`
+            );
+          }
+        } catch (addFrameError) {
+          setAddFrameResult(`❌ Frame not added: ${addFrameError}`);
         }
       } else {
         setWhitelistInfo(`Error adding to whitelist: ${whitelistData.error}`);
       }
     } catch (error) {
-      if (error instanceof AddMiniApp.RejectedByUser) {
-        setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
-      } else if (error instanceof AddMiniApp.InvalidDomainManifest) {
-        setAddFrameResult(`❌ Frame no añadido: ${error.message}`);
-      } else {
-        setWhitelistInfo(`Error: ${error}`);
-      }
+      setWhitelistInfo(`Error: ${error}`);
     }
   };
 
   // contexto del frame
   useEffect(() => {
     const load = async () => {
-      const context = await sdk.context;
-      setContext(context);
-      setAdded(context.client.added);
+      try {
+        const context = await sdk.context;
+        setContext(context);
+        setAdded(context.client.added);
 
-      // Verificar whitelist si tenemos el FID
-      if (context.user?.fid) {
-        await checkWhitelistStatus(context.user.fid);
+        // Verificar whitelist si tenemos el FID
+        if (context.user?.fid) {
+          await checkWhitelistStatus(context.user.fid);
+        }
+
+        console.log("Calling ready");
+        await sdk.actions.ready();
+      } catch (error) {
+        console.error("Error loading SDK context:", error);
       }
-
-      sdk.on("frameAddRejected", ({ reason }) => {
-        console.log(`Frame add rejected: ${reason}`);
-      });
-
-      sdk.on("frameRemoved", () => {
-        setAdded(false);
-      });
-
-      sdk.on("primaryButtonClicked", () => {
-        console.log("primaryButtonClicked");
-      });
-
-      console.log("Calling ready");
-      sdk.actions.ready({});
     };
 
     if (sdk && !isSDKLoaded) {
       console.log("Calling load");
       setIsSDKLoaded(true);
       load();
-      return () => {
-        sdk.removeAllListeners();
-      };
     }
   }, [isSDKLoaded, checkWhitelistStatus]);
 

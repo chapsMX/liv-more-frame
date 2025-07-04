@@ -19,10 +19,12 @@ export async function POST(request: Request) {
     }
 
     console.log('🔄 Ejecutando actualización en whitelist_users...');
-    const result = await sql(
-      'UPDATE whitelist_users SET accepted_tos = $1, accepted_privacy_policy = $2, updated_at = NOW() WHERE user_fid = $3 RETURNING *',
-      [accepted_tos, accepted_privacy_policy, user_fid]
-    );
+    const result = await sql`
+      UPDATE whitelist_users 
+      SET accepted_tos = ${accepted_tos}, accepted_privacy_policy = ${accepted_privacy_policy}, updated_at = NOW() 
+      WHERE user_fid = ${user_fid} 
+      RETURNING *
+    `;
 
     if (!result || result.length === 0) {
       console.warn(`⚠️ Usuario no encontrado para FID: ${user_fid}`);

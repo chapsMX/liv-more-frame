@@ -55,6 +55,28 @@ export default function DashboardInicial() {
   // State para challenges oficiales
   const [officialChallenges, setOfficialChallenges] = useState<Challenge[]>([]);
   const [loadingChallenges, setLoadingChallenges] = useState(true);
+  
+  // State para leaderboards
+  const [monthlyLeaderboard, setMonthlyLeaderboard] = useState<{
+    steps: LeaderboardEntry[];
+    calories: LeaderboardEntry[];
+  }>({
+    steps: [],
+    calories: []
+  });
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+
+  // Interface para LeaderboardEntry
+  interface LeaderboardEntry {
+    rank: number;
+    user_fid: number;
+    username: string;
+    display_name: string;
+    monthly_total: number;
+    active_days_in_month: number;
+    daily_average: number;
+    metric: string;
+  }
 
   // Interface para Challenge
   interface Challenge {
@@ -334,7 +356,7 @@ export default function DashboardInicial() {
     }
   };
 
-  function calculateDailyProgress() {
+   function calculateDailyProgress() {
     // Usar userGoals de la API optimizada
     const caloriesProgress = (dailyMetrics.calories / userGoals.calories_goal) * 100;
     const stepsProgress = (dailyMetrics.steps / userGoals.steps_goal) * 100;
@@ -351,30 +373,9 @@ export default function DashboardInicial() {
     const sleepCompleted = (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1;
     
     return caloriesCompleted && stepsCompleted && sleepCompleted;
-  }
+  } 
 
-  function getProgressMessage() {
-    const progress = calculateDailyProgress();
-    const allGoalsCompleted = areAllGoalsCompleted();
-    
-    if (allGoalsCompleted) {
-      return "You crushed it yesterday! 💥 All goals completed — share your amazing achievement!";
-    } else if (progress >= 86) {
-      return "So close yesterday! ⚡ You were almost at 100% — keep that momentum going today!";
-    } else if (progress >= 61) {
-      return "Strong performance yesterday! You're building great habits.";
-    } else if (progress >= 41) {
-      return "Good progress yesterday! Every step counts towards your goals.";
-    } else if (progress >= 21) {
-      return "Yesterday was a start — today is a new opportunity to do even better! 💪";
-    } else {
-      return "Yesterday's behind you — today is a fresh chance to crush your goals! 💪";
-    }
-  }
-
-
-
-  const handleShare = async () => {
+    const handleShare = async () => {
     try {
       const imageID = userState.userFid;
       const time = Math.floor(Date.now() / 1000);
@@ -413,7 +414,7 @@ export default function DashboardInicial() {
     } catch (error) {
       console.error('Error sharing achievement:', error);
     }
-  };
+  }; 
 
   // ✅ CORRECTED: Funciones para mostrar semana PREVIA a ayer (no incluyendo ayer)
   function getWeekDateRange() {
@@ -546,6 +547,40 @@ export default function DashboardInicial() {
     checkExistingAttestations();
   }, [checkExistingAttestations]);
 
+  // Fetch monthly leaderboard
+  const fetchMonthlyLeaderboard = useCallback(async () => {
+    setLoadingLeaderboard(true);
+    try {
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+
+      // Fetch steps leaderboard
+      const stepsResponse = await fetch(`/api/leaderboard/monthly?metric=steps&year=${year}&month=${month}&limit=3`);
+      const stepsData = await stepsResponse.json();
+
+      // Fetch calories leaderboard
+      const caloriesResponse = await fetch(`/api/leaderboard/monthly?metric=calories&year=${year}&month=${month}&limit=3`);
+      const caloriesData = await caloriesResponse.json();
+
+      if (stepsResponse.ok && caloriesResponse.ok) {
+        setMonthlyLeaderboard({
+          steps: stepsData.leaderboard || [],
+          calories: caloriesData.leaderboard || []
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching monthly leaderboard:', error);
+      setMonthlyLeaderboard({ steps: [], calories: [] });
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMonthlyLeaderboard();
+  }, [fetchMonthlyLeaderboard]);
+
   // Fetch official challenges
   useEffect(() => {
     const fetchOfficialChallenges = async () => {
@@ -601,9 +636,9 @@ export default function DashboardInicial() {
       
       {!showGoalsModal && (
         <>
-          <div className="container mx-auto px-4 py-2">
+          <div className="container mx-auto px-2 py-1 mb-0">
             {/* Header */}
-            <div className="flex justify-between items-center w-full max-w-2xl mb-2">
+            <div className="flex justify-between items-center w-full max-w-6xl mb-0">
               <div className="flex items-center">
                 <Image
                   src="/livMore_w.png"
@@ -642,15 +677,133 @@ export default function DashboardInicial() {
               </div>
             </div>
 
-            {/* Contenido principal del dashboard */}
-            <div className="flex flex-col items-center justify-center space-y-6 p-2">
-              {/* Primera fila: Título */}
+            {/* fila 1 - Liv More */}
+            <div className="flex flex-col items-center justify-center space-y-2 p-2">
+              {/* Fila cero */}
               <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
-                Yesterday's Activity
+                Welcome to Liv More!
               </h1>
-
-              {/* Segunda fila: Fecha de ayer */}
-              <div className={`text-xl text-gray-400 mb-4 ${protoMono.className}`}>
+               {/* fila 2 - Leaderboards */}
+               <div className="mt-2 w-full max-w-6xl mb-0">
+                 <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
+                 <h1 className={`text-xl font-bold text-center text-white mb-0 ${protoMono.className}`}>Activity Leaderboard 🎯</h1>
+                   <p className={`text-sm text-gray-400 mb-2 ${protoMono.className}`}>
+                   See how you stack up against other Farcaster users. Every step, calorie & hour of sleep counts toward your rank.
+                   </p>
+                   
+                   {/* Medal Board */}
+                   <div className="w-full space-y-0">
+                     {loadingLeaderboard ? (
+                       <div className="text-gray-400 text-center py-4">Loading leaderboard...</div>
+                     ) : (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {/* Steps Leaderboard */}
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center">
+                                <StepsIcon className="w-6 h-6 text-green-500 mr-2" />
+                                <h3 className="text-xl font-bold text-white">Steps</h3>
+                              </div>
+                              <button 
+                                onClick={() => router.push('/leaderboard')}
+                                className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
+                              >
+                                View All →
+                              </button>
+                            </div>
+                            <div className="space-y-1 mb-1">
+                             {monthlyLeaderboard.steps.length === 0 ? (
+                               <div className="text-gray-400 text-center py-2">No data available</div>
+                             ) : (
+                               monthlyLeaderboard.steps.map((entry, index) => (
+                                 <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
+                                   index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
+                                   index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
+                                   'bg-orange-500/20 border border-orange-500/30'
+                                 }`}>
+                                   <div className="flex items-center">
+                                     <span className="text-2xl mr-2">
+                                       {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                     </span>
+                                     <div>
+                                       <div className="text-white font-semibold text-sm">
+                                         {entry.display_name || entry.username}
+                                       </div>
+                                       <div className="text-gray-400 text-xs">
+                                         {entry.active_days_in_month} days active
+                                       </div>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <div className="text-white font-bold">
+                                       {entry.monthly_total.toLocaleString()}
+                                     </div>
+                                     <div className="text-gray-400 text-xs">
+                                       {entry.daily_average.toLocaleString()}/day
+                                     </div>
+                                   </div>
+                                 </div>
+                               ))
+                             )}
+                           </div>
+                         {/* Calories Leaderboard */}
+                            <div className="flex items-center justify-between mb-0">
+                              <div className="flex items-center">
+                                <CaloriesIcon className="w-6 h-6 text-orange-500 mr-2" />
+                                <h3 className="text-xl font-bold text-white">Calories</h3>
+                              </div>
+                              <button 
+                                onClick={() => router.push('/leaderboard')}
+                                className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
+                              >
+                                View All →
+                              </button>
+                            </div>
+                           <div className="space-y-1 mb-1">
+                             {monthlyLeaderboard.calories.length === 0 ? (
+                               <div className="text-gray-400 text-center py-2">No data available</div>
+                             ) : (
+                               monthlyLeaderboard.calories.map((entry, index) => (
+                                 <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
+                                   index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
+                                   index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
+                                   'bg-orange-500/20 border border-orange-500/30'
+                                 }`}>
+                                   <div className="flex items-center">
+                                     <span className="text-2xl mr-2">
+                                       {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                     </span>
+                                     <div>
+                                       <div className="text-white font-semibold text-sm">
+                                         {entry.display_name || entry.username}
+                                       </div>
+                                       <div className="text-gray-400 text-xs">
+                                         {entry.active_days_in_month} days active
+                                       </div>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <div className="text-white font-bold">
+                                       {entry.monthly_total.toLocaleString()}
+                                     </div>
+                                     <div className="text-gray-400 text-xs">
+                                       {entry.daily_average.toLocaleString()}/day
+                                     </div>
+                                   </div>
+                                 </div>
+                               ))
+                             )}
+                           </div>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               </div>
+             {/* fila 3 - Yesterday's Activity */}
+             <hr></hr>
+              <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
+                Mintable Activity
+              </h1>
+              <div className={`text-sm text-gray-400 mb-4 ${protoMono.className}`}>
                 {userState.timezone ? (() => {
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
@@ -674,9 +827,8 @@ export default function DashboardInicial() {
                 })()
                 }
               </div>
-
-              {/* Tercera fila: Métricas con íconos */}
-              <div className="grid grid-cols-3 mb-2 gap-8 w-full max-w-4xl">
+              {/* iconos de las métricas */}
+              <div className="grid grid-cols-3 mb-2 gap-8 w-full max-w-6xl">
                 {/* Calorías */}
                 <div className="flex flex-col items-center">
                   <div className="relative">
@@ -732,10 +884,40 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-              {/* Carrusel de Official Challenges */}
-              <div className="mt-2 w-full max-w-4xl mb-0">
+               {/* Mint Attestations Section - Show if at least one goal is completed */}
+                {(
+                (dailyMetrics.calories / userGoals.calories_goal) >= 1 ||
+                (dailyMetrics.steps / userGoals.steps_goal) >= 1 ||
+                (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1
+              ) && (
+                <div className="w-full max-w-6xl space-y-4 mb-0">
+                  <div className={`space-y-4 ${protoMono.className}`}>
+                  <div className={`text-center`}>
+                    <h1 className={`text-xl text-center font-bold text-white mb-0 ${protoMono.className}`}>
+                    🎉 Great performance 🎉
+                      </h1>
+                      <span 
+                        onClick={handleShare}
+                        className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
+                      >
+                      Share activity to Farcaster
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowMintModal(true)}
+                      className="w-full max-w-md mx-auto py-3 px-6 rounded-xl border-2 border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300 ease-in-out transform hover:scale-105"
+                    >
+                      <span className={`text-sm font-bold text-[#00FF94] ${protoMono.className}`}>
+                        🏆 You achieved some of your goals yesterday, mint an attestation 🏆
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* fila 4 - Carrusel de Official Challenges */}
+              <div className="mt-2 w-full max-w-6xl mb-0">
                 <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
-                  <h2 className="text-2xl font-bold text-white text-center">Official Challenges</h2>
+                <h1 className={`text-xl font-bold text-white text-center mb-0 ${protoMono.className}`}>Official Challenges</h1>
                   
                   <div className="w-full overflow-x-auto pb-2 mb-0">
                     <div className="flex flex-row gap-4 snap-x snap-mandatory overflow-x-auto px-1 mb-0">
@@ -782,62 +964,13 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-              {/* Cuarta fila: Progreso de Ayer */}
-              <div className="mt-2 w-full mb-0 max-w-4xl">
+              {/* fila 5: Actividad Semanal */}
+              <div className="mt-2 w-full max-w-6xl border-t border-gray-800 pt-2">
                 <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                  <p className={`text-lg mb-0 font-bold text-white`}>
-                    Yesterday's Progress: {calculateDailyProgress()}%
-                  </p>
-                  <p className={`text-base text-gray-300`}>
-                    {getProgressMessage()}
-                    {areAllGoalsCompleted() && (
-                      <span 
-                        onClick={handleShare}
-                        className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
-                      >
-                      Share to Farcaster
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Mint Attestations Section - Show if at least one goal is completed */}
-              {(
-                (dailyMetrics.calories / userGoals.calories_goal) >= 1 ||
-                (dailyMetrics.steps / userGoals.steps_goal) >= 1 ||
-                (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1
-              ) && (
-                <div className="w-full max-w-4xl space-y-4 mb-0">
-                  <div className={`text-center space-y-4 ${protoMono.className}`}>
-                    <div>
-                      <p className={`text-lg mb-2 font-bold text-white`}>
-                        Great performance yesterday! 🎉
-                      </p>
-                      <p className={`text-base text-gray-300 mb-4`}>
-                        You achieved some of your goals yesterday. Mint attestations for your completed achievements onchain.
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={() => setShowMintModal(true)}
-                      className="w-full max-w-md mx-auto py-3 px-6 rounded-xl border-2 border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300 ease-in-out transform hover:scale-105"
-                    >
-                      <span className={`text-lg font-bold text-[#00FF94] ${protoMono.className}`}>
-                        🏆 Mint Completed Achievements
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Quinta fila: Actividad Semanal */}
-              <div className="mt-2 w-full max-w-4xl border-t border-gray-800 pt-2">
-                <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                  <h2 className={`text-2xl text-center font-bold text-white mb-0`}>
-                    Weekly Activity
-                  </h2>
-                  <div className={`text-xl text-center text-gray-400`}>
+                <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
+                Weekly Activity
+              </h1>
+                  <div className={`text-sm text-gray-400 mb-4 ${protoMono.className}`}>
                     {getWeekDateRange()}
                   </div>
 
@@ -953,6 +1086,17 @@ export default function DashboardInicial() {
                         </div>
                       </div>
                     </div>
+                                  
+              <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg">
+                             <p className={`text-2xs text-gray-300 text-center mb-1 ${protoMono.className}`}>
+                             Track and prove your healthy habits with wearables and onchain attestations, climb the Farcaster leaderboard and earn rewards.
+               </p>
+                  <p className="text-center text-gray-400 text-sm">
+                   built with <span className="text-red-500 text-lg">❤</span> during ETH Denver<br/>
+                   Just Frame It finalist!<br/>
+                   Proudly built on Base 🔵 💙
+                 </p> 
+               </div>
                   </div>
                 </div>
               </div>

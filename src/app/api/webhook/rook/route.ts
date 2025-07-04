@@ -256,7 +256,7 @@ async function updateDailyActivityV2(
   data: DailyActivityData,
   dataSource?: string,
   rookUserId?: string,
-  metadata?: any
+  metadata?: RookMetadata
 ) {
   try {
     const processingDate = new Date().toISOString().split('T')[0];
