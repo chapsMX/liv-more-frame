@@ -31,38 +31,57 @@ export default function LivMore() {
   const [added, setAdded] = useState(false);
   const [addFrameResult, setAddFrameResult] = useState("");
   const [whitelistInfo, setWhitelistInfo] = useState("");
-  const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [isUserInDatabase, setIsUserInDatabase] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showPopup, setShowPopup] = useState(false);
   const [countdown, setCountdown] = useState(10);
 
-  const checkWhitelistStatus = async (fid: number) => {
+  const checkUserInDatabase = async (fid: number, userContext?: SDKContext) => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/whitelist/check?fid=${fid}`);
       const data = await response.json();
       
-      setUserState({
-        isWhitelisted: data.isWhitelisted,
-        acceptedTos: data.acceptedTos,
-        acceptedPrivacyPolicy: data.acceptedPrivacyPolicy,
-        canUse: data.canUse,
-        username: data.username,
-        displayName: data.displayName,
-        userFid: fid,
-        ethAddress: data.ethAddress
-      });
-
-      // Mantener la compatibilidad con el estado local existente
-      setIsWhitelisted(data.isWhitelisted);
+      // Si el usuario existe en la base de datos (independientemente de whitelist)
+      const userExists = data.isWhitelisted || data.acceptedTos || data.acceptedPrivacyPolicy;
+      
+      if (userExists) {
+        setUserState({
+          isWhitelisted: true, // Ahora todos los usuarios pueden usar la app
+          acceptedTos: data.acceptedTos,
+          acceptedPrivacyPolicy: data.acceptedPrivacyPolicy,
+          canUse: true, // Todos pueden usar la app
+          username: data.username,
+          displayName: data.displayName,
+          userFid: fid,
+          ethAddress: data.ethAddress
+        });
+        setIsUserInDatabase(true);
+      } else {
+        // Usuario nuevo - no está en la base de datos
+        const contextToUse = userContext || context;
+        setUserState({
+          isWhitelisted: true, // Todos pueden usar la app ahora
+          acceptedTos: false,
+          acceptedPrivacyPolicy: false,
+          canUse: true,
+          username: contextToUse?.user?.username || '',
+          displayName: '',
+          userFid: fid,
+          ethAddress: ''
+        });
+        setIsUserInDatabase(false);
+      }
     } catch (error) {
-      console.error('Error checking whitelist status:', error);
+      console.error('Error checking user status:', error);
+      // En caso de error, asumir que es usuario nuevo
+      setIsUserInDatabase(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEarlyAccess = async () => {
+  const handleGetStarted = async () => {
     try {
       // Primero obtenemos la info del usuario
       if (!context?.user?.fid) {
@@ -81,7 +100,7 @@ export default function LivMore() {
       const { username, display_name, custody_address } = data.user;
       
       // Guardar en la base de datos
-      const whitelistResponse = await fetch('/api/whitelist/add', {
+      const registerResponse = await fetch('/api/whitelist/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,16 +113,16 @@ export default function LivMore() {
         }),
       });
 
-      const whitelistData = await whitelistResponse.json();
+      const registerData = await registerResponse.json();
 
-      if (whitelistData.success) {
+      if (registerData.success) {
         // Actualizar el estado del usuario después de agregarlo exitosamente
-        await checkWhitelistStatus(context.user.fid);
+        await checkUserInDatabase(context.user.fid, context);
         
         setWhitelistInfo(
-          `✨ ¡Welcome ${username}!\n` +
-          `🎉 You have been added to the whitelist.\n` +
-          `⏳ Redirecting to share page in ${countdown}s...`
+          `✨ Welcome to Liv More, ${username}!\n` +
+          `🎉 Your account has been created successfully.\n` +
+          `⏳ Redirecting to dashboard in ${countdown}s...`
         );
 
         // Mostrar popup
@@ -137,7 +156,7 @@ export default function LivMore() {
           setAddFrameResult(`❌ Frame not added: ${addFrameError}`);
         }
       } else {
-        setWhitelistInfo(`Error adding to whitelist: ${whitelistData.error}`);
+        setWhitelistInfo(`Error creating account: ${registerData.error}`);
       }
     } catch (error) {
       setWhitelistInfo(`Error: ${error}`);
@@ -154,7 +173,7 @@ export default function LivMore() {
 
         // Verificar whitelist si tenemos el FID
         if (context.user?.fid) {
-          await checkWhitelistStatus(context.user.fid);
+          await checkUserInDatabase(context.user.fid, context);
         }
 
         console.log("Calling ready");
@@ -169,46 +188,28 @@ export default function LivMore() {
       setIsSDKLoaded(true);
       load();
     }
-  }, [isSDKLoaded, checkWhitelistStatus]);
+  }, [isSDKLoaded]);
 
   useEffect(() => {
-    // Redirigir al dashboard si el usuario cumple con todos los requisitos
+    // Redirigir al dashboard si el usuario existe en DB y ha aceptado términos
     console.log('🔍 Verificando estado del usuario:', {
-      isWhitelisted: userState.isWhitelisted,
+      isUserInDatabase,
       acceptedTos: userState.acceptedTos,
       acceptedPrivacyPolicy: userState.acceptedPrivacyPolicy,
-      canUse: userState.canUse,
       username: userState.username
     });
 
-    if (userState.isWhitelisted && userState.acceptedTos && userState.acceptedPrivacyPolicy && userState.canUse) {
-      console.log('✅ Usuario cumple todos los requisitos, redirigiendo a dashboard...');
+    if (isUserInDatabase && userState.acceptedTos && userState.acceptedPrivacyPolicy) {
+      console.log('✅ Usuario existente con términos aceptados, redirigiendo a dashboard...');
       router.push('/dashboard');
-    } else {
-      console.log('❌ Usuario no cumple todos los requisitos:', {
-        faltaWhitelist: !userState.isWhitelisted ? 'No está en whitelist' : null,
-        faltaTos: !userState.acceptedTos ? 'No ha aceptado TOS' : null,
-        faltaPP: !userState.acceptedPrivacyPolicy ? 'No ha aceptado Privacy Policy' : null,
-        faltaCanUse: !userState.canUse ? 'No tiene permiso de uso' : null
-      });
+    } else if (isUserInDatabase && (!userState.acceptedTos || !userState.acceptedPrivacyPolicy)) {
+      console.log('ℹ️ Usuario existente sin términos aceptados, mostrando modal TOS...');
+    } else if (!isUserInDatabase && !isLoading) {
+      console.log('ℹ️ Usuario nuevo, mostrando interfaz de registro...');
     }
-  }, [userState, router]);
+  }, [isUserInDatabase, userState.acceptedTos, userState.acceptedPrivacyPolicy, isLoading, router]);
 
-  const handleShare = async () => {
-    try {
-      const text = "I joined the waitlist for @livmore 🧬 🧬";
-      const url = "https://app.livmore.life";
-      
-      await sdk.actions.composeCast({
-        text: text,
-        embeds: [url]
-      });
-    } catch (error) {
-      console.error('Error sharing frame:', error);
-    }
-  };
-
-  const shouldShowTOSModal = userState.isWhitelisted && (!userState.acceptedTos || !userState.acceptedPrivacyPolicy);
+  const shouldShowTOSModal = isUserInDatabase && (!userState.acceptedTos || !userState.acceptedPrivacyPolicy);
 
   if (shouldShowTOSModal) {
     return <TOSModal username={context?.user?.username} />;
@@ -228,7 +229,7 @@ export default function LivMore() {
   return (
     <div className="min-h-screen bg-black text-white font-mono flex flex-col">
       <main className="flex-1 flex items-center justify-center p-2">
-        {isWhitelisted ? (
+        {isUserInDatabase ? (
           <div className="flex flex-col items-center gap-6">
             <Image
               src="/livMore_w.png"
@@ -240,17 +241,8 @@ export default function LivMore() {
             />
             
             <div className={`text-center ${protoMono.className}`}>
-              <h2 className="text-2xl font-bold mb-2">You are on the Whitelist!</h2>
-              <p className="text-gray-400">We will notify you when we launch.</p>
-            </div>
-
-            <div className="flex flex-col gap-4 items-center">
-              <Boton
-                onClick={handleShare}
-                className="mt-4 border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 px-6 rounded"
-              >
-                <span className={`text-base font-semibold ${protoMono.className}`}>Share Frame</span>
-              </Boton>
+              <h2 className="text-2xl font-bold mb-2">Welcome back!</h2>
+              <p className="text-gray-400">Loading your dashboard...</p>
             </div>
           </div>
         ) : (
@@ -339,17 +331,17 @@ export default function LivMore() {
             <div className={`flex flex-col items-center gap-3 w-full max-w-2xl ${protoMono.className}`}>
               <div className="relative">
                 <p className="text-sm text-center leading-relaxed mt-1 text-white-400">
-                  You will be notified when we launch!
+                  Join Liv More to start tracking your wellness journey!
                 </p>
               </div>
               
               <div className="flex gap-4 w-full">
                 <Boton
-                  onClick={handleEarlyAccess}
+                  onClick={handleGetStarted}
                   disabled={added}
                   className="w-full border-2 border-gray-800 bg-gray-900 hover:bg-gray-800 flex items-center justify-center gap-2 py-3 rounded"
                 > 
-                  <span className="text-base font-semibold">Join Early Access</span>
+                  <span className="text-base font-semibold">Get Started</span>
                 </Boton>
               </div>
 

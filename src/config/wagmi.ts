@@ -21,8 +21,8 @@ export const config = createConfig({
         metadata: {
           name: 'Liv More',
           description: 'Turn healthy habits into rewards',
-          url: 'https://app.livmore.app',
-          icons: ['https://livmore.app/icon.png'],
+          url: 'https://app.livmore.life',
+          icons: ['https://livmore.life/icon.png'],
         },
       })
     ] : []),

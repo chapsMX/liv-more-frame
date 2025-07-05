@@ -70,6 +70,9 @@ export default function DashboardInicial() {
   // State para acordeón de actividad de hoy
   const [showTodayActivity, setShowTodayActivity] = useState(false);
 
+  // State para acordeón de conectar dispositivo
+  const [showConnectDevice, setShowConnectDevice] = useState(false);
+
   // Interface para LeaderboardEntry
   interface LeaderboardEntry {
     rank: number;
@@ -194,14 +197,12 @@ export default function DashboardInicial() {
       setIsCheckingAccess(true);
       
       console.log('🔍 Verificando permisos básicos:', {
-        isWhitelisted: userState.isWhitelisted,
         acceptedTos: userState.acceptedTos,
-        acceptedPrivacyPolicy: userState.acceptedPrivacyPolicy,
-        canUse: userState.canUse
+        acceptedPrivacyPolicy: userState.acceptedPrivacyPolicy
       });
 
-      if (!userState.isWhitelisted || !userState.acceptedTos || !userState.acceptedPrivacyPolicy || !userState.canUse) {
-        console.log('⚠️ Acceso denegado al Dashboard - Permisos insuficientes');
+      if (!userState.acceptedTos || !userState.acceptedPrivacyPolicy) {
+        console.log('⚠️ Acceso denegado al Dashboard - Debe aceptar términos y condiciones');
         router.push('/');
         return;
       }
@@ -214,7 +215,7 @@ export default function DashboardInicial() {
     if (!initialCheckDone) {
       checkInitialPermissions();
     }
-  }, [userState.isWhitelisted, userState.acceptedTos, userState.acceptedPrivacyPolicy, userState.canUse, router, initialCheckDone]);
+  }, [userState.acceptedTos, userState.acceptedPrivacyPolicy, router, initialCheckDone]);
 
   useEffect(() => {
     const checkGoalsAndProvider = async () => {
@@ -225,7 +226,7 @@ export default function DashboardInicial() {
       // Check goals first
       await checkUserGoals();
       
-      // Only check provider if we have valid goals
+      // Check provider status (but don't redirect automatically)
       if (hasValidGoals) {
         const providerStatus = await checkConnection();
         console.log('🔍 Estado de conexión verificado:', {
@@ -240,11 +241,10 @@ export default function DashboardInicial() {
           });
         }
 
-        // Redirect to device connection if no provider or provider is 'NULL'
+        // Note: We no longer redirect automatically to device connection
+        // Users can now access the dashboard and manually connect their device
         if (!providerStatus || providerStatus === 'NULL') {
-          console.log('⚠️ Usuario sin provider conectado - Redirigiendo a RookDeviceConnection');
-          router.push('/connect-device');
-          return;
+          console.log('ℹ️ Usuario sin provider conectado - Se mostrará botón para conectar dispositivo');
         }
       }
 
@@ -257,7 +257,6 @@ export default function DashboardInicial() {
     hasValidGoals,
     checkConnection,
     checkUserGoals,
-    router,
     setUserState,
     userState.connectedProvider
   ]);
@@ -271,7 +270,10 @@ export default function DashboardInicial() {
   // ✅ OPTIMIZED: Single useEffect using local database instead of 50+ Rook API calls
   useEffect(() => {
     const fetchOptimizedHealthData = async () => {
-      if (!userState.userFid || !userState.connectedProvider) return;
+      if (!userState.userFid || !userState.connectedProvider || userState.connectedProvider === 'NULL') {
+        console.log('ℹ️ [OPTIMIZED] Saltando fetch de datos - no hay provider conectado');
+        return;
+      }
 
       try {
         console.log('🚀 [OPTIMIZED] Obteniendo datos de salud desde base de datos local para usuario:', userState.userFid);
@@ -325,14 +327,17 @@ export default function DashboardInicial() {
       }
     };
 
-    if (initialCheckDone && userState.connectedProvider) {
+    if (initialCheckDone && userState.connectedProvider && userState.connectedProvider !== 'NULL') {
       fetchOptimizedHealthData();
     }
   }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone, syncUserChallenges]);
 
   // ✅ NEW: Función para obtener datos de HOY (today)
   const fetchTodayHealthData = useCallback(async () => {
-    if (!userState.userFid || !userState.connectedProvider) return;
+    if (!userState.userFid || !userState.connectedProvider || userState.connectedProvider === 'NULL') {
+      console.log('ℹ️ [TODAY] Saltando fetch de datos de hoy - no hay provider conectado');
+      return;
+    }
 
     try {
       console.log('🔄 [TODAY] Obteniendo datos de salud del día de hoy para usuario:', userState.userFid);
@@ -364,7 +369,7 @@ export default function DashboardInicial() {
 
   // ✅ NEW: useEffect para obtener datos de HOY
   useEffect(() => {
-    if (initialCheckDone && userState.connectedProvider) {
+    if (initialCheckDone && userState.connectedProvider && userState.connectedProvider !== 'NULL') {
       fetchTodayHealthData();
     }
   }, [initialCheckDone, fetchTodayHealthData]);
@@ -552,7 +557,10 @@ export default function DashboardInicial() {
 
 
   const checkExistingAttestations = useCallback(async () => {
-    if (!userState.userFid) return;
+    if (!userState.userFid || !userState.connectedProvider || userState.connectedProvider === 'NULL') {
+      console.log('ℹ️ [Attestations] Saltando verificación - no hay provider conectado');
+      return;
+    }
     
     try {
       // ✅ UPDATED: Usar timezone del usuario para determinar "yesterday"
@@ -577,7 +585,7 @@ export default function DashboardInicial() {
     } catch (error) {
       console.error('Error checking existing attestations:', error);
     }
-  }, [userState.userFid, userState.timezone]);
+  }, [userState.userFid, userState.timezone, userState.connectedProvider]);
 
   useEffect(() => {
     checkExistingAttestations();
@@ -720,192 +728,243 @@ export default function DashboardInicial() {
                 Liv More 2.0
               </h1>
 
-              {/* Acordeón de Today's Activity */}
-              <div className="w-full max-w-4xl">
-                <button
-                  onClick={() => setShowTodayActivity(!showTodayActivity)}
-                  className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all duration-300 ${protoMono.className}`}
-                >
-                  <span className="text-white font-semibold">Todays Activity</span>
-                  <span className={`transform transition-transform duration-300 ${showTodayActivity ? 'rotate-180' : ''}`}>
-                    ⬇️
-                  </span>
-                </button>
+              {/* Acordeones en dos columnas */}
+              <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Primera columna - Today's Activity */}
+                <div className="w-full">
+                  <button
+                    onClick={() => setShowTodayActivity(!showTodayActivity)}
+                    className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all duration-300 ${protoMono.className}`}
+                  >
+                    <span className="text-white font-semibold">Todays Activity</span>
+                    <span className={`transform transition-transform duration-300 ${showTodayActivity ? 'rotate-180' : ''}`}>
+                      ⬇️
+                    </span>
+                  </button>
 
-                {/* Sección expandible con estadísticas de hoy */}
-                {showTodayActivity && (
-                  <div className="mt-3 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg space-y-3 transition-all duration-300 ease-in-out">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Steps de hoy */}
-                      <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                        <div className="flex items-center">
-                          <StepsIcon className="w-8 h-8 text-green-500 mr-3" />
-                          <div>
-                            <p className="text-gray-400 text-sm">Steps</p>
-                            <p className={`text-white text-xl font-bold ${protoMono.className}`}>
-                              {todayMetrics.steps.toLocaleString()}
-                            </p>
+                  {/* Sección expandible con estadísticas de hoy */}
+                  {showTodayActivity && (
+                    <div className="mt-3 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg space-y-3 transition-all duration-300 ease-in-out">
+                      <div className="grid grid-cols-1 gap-4">
+                        {/* Steps de hoy */}
+                        <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                          <div className="flex items-center">
+                            <StepsIcon className="w-8 h-8 text-green-500 mr-3" />
+                            <div>
+                              <p className="text-gray-400 text-sm">Steps</p>
+                              <p className={`text-white text-xl font-bold ${protoMono.className}`}>
+                                {todayMetrics.steps.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Calories de hoy */}
+                        <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                          <div className="flex items-center">
+                            <CaloriesIcon className="w-8 h-8 text-orange-500 mr-3" />
+                            <div>
+                              <p className="text-gray-400 text-sm">Calories</p>
+                              <p className={`text-white text-xl font-bold ${protoMono.className}`}>
+                                {todayMetrics.calories.toLocaleString()}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      {/* Calories de hoy */}
-                      <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                        <div className="flex items-center">
-                          <CaloriesIcon className="w-8 h-8 text-orange-500 mr-3" />
-                          <div>
-                            <p className="text-gray-400 text-sm">Calories</p>
-                            <p className={`text-white text-xl font-bold ${protoMono.className}`}>
-                              {todayMetrics.calories.toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Fecha de hoy */}
-                    <div className="text-center border-t border-gray-700 pt-3">
-                      <p className={`text-sm text-gray-400 ${protoMono.className}`}>
-                        {userState.timezone ? (() => {
-                          const today = new Date();
-                          return today.toLocaleDateString('en-US', { 
-                            timeZone: userState.timezone,
+                      
+                      {/* Fecha de hoy */}
+                      <div className="text-center border-t border-gray-700 pt-3">
+                        <p className={`text-sm text-gray-400 ${protoMono.className}`}>
+                          {userState.timezone ? (() => {
+                            const today = new Date();
+                            return today.toLocaleDateString('en-US', { 
+                              timeZone: userState.timezone,
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            });
+                          })() :
+                          new Date().toLocaleDateString('en-US', { 
                             weekday: 'long',
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric'
-                          });
-                        })() :
-                        new Date().toLocaleDateString('en-US', { 
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })
-                        }
-                      </p>
+                          })
+                          }
+                        </p>
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Segunda columna - Connect Your Device (solo si no hay provider) */}
+                {(!userState.connectedProvider || userState.connectedProvider === 'NULL') && (
+                  <div className="w-full">
+                    <button
+                      onClick={() => setShowConnectDevice(!showConnectDevice)}
+                      className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 border-purple-500 bg-blue-900/20 hover:bg-blue-800/30 transition-all duration-300 ${protoMono.className}`}
+                    >
+                      <span className="text-white font-semibold">Connect Your Wearable</span>
+                      <span className={`transform transition-transform duration-300 ${showConnectDevice ? 'rotate-180' : ''}`}>
+                        ⬇️
+                      </span>
+                    </button>
+
+                    {/* Sección expandible con opciones de conexión */}
+                    {showConnectDevice && (
+                      <div className="mt-3 p-4 bg-blue-900/20 border-2 border-purple-500 rounded-lg space-y-3 transition-all duration-300 ease-in-out">
+                        <div  className={`${protoMono.className}`}>
+                          <h2 className={`text-lg font-bold text-center text-white mb-0 ${protoMono.className}`}>
+                            Connect Your Wearable Device
+                          </h2>
+                          <p className={`text-sm text-gray-300 mb-4 ${protoMono.className}`}>
+                            Connect your fitness tracker to start tracking your health data and earn rewards.
+                            <br />
+                            Supported: Fitbit, Garmin, Oura, Whoop* & Polar
+                            <br />
+                            * Whoop only tracks calories.
+                          </p>
+                          <button
+                            onClick={() => router.push('/connect-device')}
+                            className={`px-6 py-3 bg-purple-500 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors ${protoMono.className}`}
+                          >
+                            Connect Your Device
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
 
-               {/* fila 2 - Leaderboards */}
-               <div className="mt-2 w-full max-w-6xl mb-0">
-                 <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
-                 <h1 className={`text-xl font-bold text-center text-white mb-0 ${protoMono.className}`}>Activity Leaderboard 🎯</h1>
-                   <p className={`text-sm text-gray-400 mb-2 ${protoMono.className}`}>
-                   See how you stack up against other Farcaster users. Every step, calorie & hour of sleep counts toward your rank.
-                   </p>
-                   
-                   {/* Medal Board */}
-                   <div className="w-full space-y-0">
-                     {loadingLeaderboard ? (
-                       <div className="text-gray-400 text-center py-4">Loading leaderboard...</div>
-                     ) : (
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {/* Steps Leaderboard */}
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center">
-                                <StepsIcon className="w-6 h-6 text-green-500 mr-2" />
-                                <h3 className="text-xl font-bold text-white">Steps</h3>
-                              </div>
-                              <button 
-                                onClick={() => router.push('/leaderboard')}
-                                className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
-                              >
-                                View All →
-                              </button>
-                            </div>
-                            <div className="space-y-1 mb-1">
-                             {monthlyLeaderboard.steps.length === 0 ? (
-                               <div className="text-gray-400 text-center py-2">No data available</div>
-                             ) : (
-                               monthlyLeaderboard.steps.map((entry, index) => (
-                                 <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
-                                   index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
-                                   index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
-                                   'bg-orange-500/20 border border-orange-500/30'
-                                 }`}>
-                                   <div className="flex items-center">
-                                     <span className="text-2xl mr-2">
-                                       {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                     </span>
-                                     <div>
-                                       <div className="text-white font-semibold text-sm">
-                                         {entry.display_name || entry.username}
-                                       </div>
-                                       <div className="text-gray-400 text-xs">
-                                         {entry.active_days_in_month} days active
-                                       </div>
-                                     </div>
-                                   </div>
-                                   <div className="text-right">
-                                     <div className="text-white font-bold">
-                                       {entry.monthly_total.toLocaleString()}
-                                     </div>
-                                     <div className="text-gray-400 text-xs">
-                                       {entry.daily_average.toLocaleString()}/day
-                                     </div>
-                                   </div>
-                                 </div>
-                               ))
-                             )}
+                {/* Espaciador para mantener el grid cuando no hay segunda columna */}
+                {(userState.connectedProvider && userState.connectedProvider !== 'NULL') && (
+                  <div className="w-full"></div>
+                )}
+              </div>
+            </div>
+
+            {/* fila 2 - Leaderboards */}
+            <div className="mt-2 w-full max-w-6xl mb-0">
+              <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
+              <h1 className={`text-xl font-bold text-center text-white mb-0 ${protoMono.className}`}>Activity Leaderboard 🎯</h1>
+                <p className={`text-sm text-gray-400 mb-2 ${protoMono.className}`}>
+                See how you stack up against other Farcaster users. Every step, calorie & hour of sleep counts toward your rank.
+                </p>
+                
+                {/* Medal Board */}
+                <div className="w-full space-y-0">
+                  {loadingLeaderboard ? (
+                    <div className="text-gray-400 text-center py-4">Loading leaderboard...</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                       {/* Steps Leaderboard */}
+                         <div className="flex items-center justify-between mb-1">
+                           <div className="flex items-center">
+                             <StepsIcon className="w-6 h-6 text-green-500 mr-2" />
+                             <h3 className="text-xl font-bold text-white">Steps</h3>
                            </div>
-                         {/* Calories Leaderboard */}
-                            <div className="flex items-center justify-between mb-0">
-                              <div className="flex items-center">
-                                <CaloriesIcon className="w-6 h-6 text-orange-500 mr-2" />
-                                <h3 className="text-xl font-bold text-white">Calories</h3>
+                           <button 
+                             onClick={() => router.push('/leaderboard')}
+                             className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
+                           >
+                             View All →
+                           </button>
+                         </div>
+                         <div className="space-y-1 mb-1">
+                          {monthlyLeaderboard.steps.length === 0 ? (
+                            <div className="text-gray-400 text-center py-2">No data available</div>
+                          ) : (
+                            monthlyLeaderboard.steps.map((entry, index) => (
+                              <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
+                                index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
+                                index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
+                                'bg-orange-500/20 border border-orange-500/30'
+                              }`}>
+                                <div className="flex items-center">
+                                  <span className="text-2xl mr-2">
+                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                  </span>
+                                  <div>
+                                    <div className="text-white font-semibold text-sm">
+                                      {entry.display_name || entry.username}
+                                    </div>
+                                    <div className="text-gray-400 text-xs">
+                                      {entry.active_days_in_month} days active
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-white font-bold">
+                                    {entry.monthly_total.toLocaleString()}
+                                  </div>
+                                  <div className="text-gray-400 text-xs">
+                                    {entry.daily_average.toLocaleString()}/day
+                                  </div>
+                                </div>
                               </div>
-                              <button 
-                                onClick={() => router.push('/leaderboard')}
-                                className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
-                              >
-                                View All →
-                              </button>
-                            </div>
-                           <div className="space-y-1 mb-1">
-                             {monthlyLeaderboard.calories.length === 0 ? (
-                               <div className="text-gray-400 text-center py-2">No data available</div>
-                             ) : (
-                               monthlyLeaderboard.calories.map((entry, index) => (
-                                 <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
-                                   index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
-                                   index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
-                                   'bg-orange-500/20 border border-orange-500/30'
-                                 }`}>
-                                   <div className="flex items-center">
-                                     <span className="text-2xl mr-2">
-                                       {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                     </span>
-                                     <div>
-                                       <div className="text-white font-semibold text-sm">
-                                         {entry.display_name || entry.username}
-                                       </div>
-                                       <div className="text-gray-400 text-xs">
-                                         {entry.active_days_in_month} days active
-                                       </div>
-                                     </div>
-                                   </div>
-                                   <div className="text-right">
-                                     <div className="text-white font-bold">
-                                       {entry.monthly_total.toLocaleString()}
-                                     </div>
-                                     <div className="text-gray-400 text-xs">
-                                       {entry.daily_average.toLocaleString()}/day
-                                     </div>
-                                   </div>
-                                 </div>
-                               ))
-                             )}
+                            ))
+                          )}
+                        </div>
+                      {/* Calories Leaderboard */}
+                         <div className="flex items-center justify-between mb-0">
+                           <div className="flex items-center">
+                             <CaloriesIcon className="w-6 h-6 text-orange-500 mr-2" />
+                             <h3 className="text-xl font-bold text-white">Calories</h3>
                            </div>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-               </div>
-             {/* fila 3 - Yesterday's Activity */}
-             <hr></hr>
+                           <button 
+                             onClick={() => router.push('/leaderboard')}
+                             className="text-violet-500 hover:text-violet-400 text-sm transition-colors"
+                           >
+                             View All →
+                           </button>
+                         </div>
+                        <div className="space-y-1 mb-1">
+                          {monthlyLeaderboard.calories.length === 0 ? (
+                            <div className="text-gray-400 text-center py-2">No data available</div>
+                          ) : (
+                            monthlyLeaderboard.calories.map((entry, index) => (
+                              <div key={entry.user_fid} className={`flex items-center justify-between p-2 rounded-lg ${
+                                index === 0 ? 'bg-yellow-500/20 border border-yellow-500/30' :
+                                index === 1 ? 'bg-gray-400/20 border border-gray-400/30' :
+                                'bg-orange-500/20 border border-orange-500/30'
+                              }`}>
+                                <div className="flex items-center">
+                                  <span className="text-2xl mr-2">
+                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                  </span>
+                                  <div>
+                                    <div className="text-white font-semibold text-sm">
+                                      {entry.display_name || entry.username}
+                                    </div>
+                                    <div className="text-gray-400 text-xs">
+                                      {entry.active_days_in_month} days active
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-white font-bold">
+                                    {entry.monthly_total.toLocaleString()}
+                                  </div>
+                                  <div className="text-gray-400 text-xs">
+                                    {entry.daily_average.toLocaleString()}/day
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* fila 3 - Yesterday's Activity */}
+            
+            <div className="flex flex-col items-center justify-center space-y-2 p-2">
               <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
                 Yesterdays Activity
               </h1>
@@ -933,6 +992,7 @@ export default function DashboardInicial() {
                 })()
                 }
               </div>
+              
               {/* iconos de las métricas */}
               <div className="grid grid-cols-3 mb-2 gap-8 w-full max-w-6xl">
                 {/* Calorías */}
@@ -990,23 +1050,23 @@ export default function DashboardInicial() {
                 </div>
               </div>
 
-               {/* Mint Attestations Section - Show if at least one goal is completed */}
-                {(
+              {/* Mint Attestations Section - Show if at least one goal is completed */}
+              {(
                 (dailyMetrics.calories / userGoals.calories_goal) >= 1 ||
                 (dailyMetrics.steps / userGoals.steps_goal) >= 1 ||
                 (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1
               ) && (
                 <div className="w-full max-w-6xl space-y-4 mb-0">
                   <div className={`space-y-4 ${protoMono.className}`}>
-                  <div className={`text-center`}>
-                    <h1 className={`text-xl text-center font-bold text-white mb-0 ${protoMono.className}`}>
-                    🎉 Great performance 🎉
+                    <div className={`text-center`}>
+                      <h1 className={`text-xl text-center font-bold text-white mb-0 ${protoMono.className}`}>
+                        🎉 Great performance 🎉
                       </h1>
                       <span 
                         onClick={handleShare}
                         className="text-violet-500 hover:text-violet-400 cursor-pointer transition-colors ml-1"
                       >
-                      Share activity to Farcaster
+                        Share activity to Farcaster
                       </span>
                     </div>
                     <button
@@ -1020,10 +1080,11 @@ export default function DashboardInicial() {
                   </div>
                 </div>
               )}
+              
               {/* fila 4 - Carrusel de Official Challenges */}
               <div className="mt-2 w-full max-w-6xl mb-0">
                 <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
-                <h1 className={`text-xl font-bold text-white text-center mb-0 ${protoMono.className}`}>Official Challenges</h1>
+                  <h1 className={`text-xl font-bold text-white text-center mb-0 ${protoMono.className}`}>Official Challenges</h1>
                   
                   <div className="w-full overflow-x-auto pb-2 mb-0">
                     <div className="flex flex-row gap-4 snap-x snap-mandatory overflow-x-auto px-1 mb-0">
@@ -1073,9 +1134,9 @@ export default function DashboardInicial() {
               {/* fila 5: Actividad Semanal */}
               <div className="mt-2 w-full max-w-6xl border-t border-gray-800 pt-2">
                 <div className={`relative z-10 space-y-2 ${protoMono.className}`}>
-                <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
-                Weekly Activity
-              </h1>
+                  <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
+                    Weekly Activity
+                  </h1>
                   <div className={`text-sm text-gray-400 mb-4 ${protoMono.className}`}>
                     {getWeekDateRange()}
                   </div>
@@ -1192,17 +1253,17 @@ export default function DashboardInicial() {
                         </div>
                       </div>
                     </div>
-                                  
-              <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg">
-                             <p className={`text-2xs text-gray-300 text-center mb-1 ${protoMono.className}`}>
-                             Track and prove your healthy habits with wearables and onchain attestations, climb the Farcaster leaderboard and earn rewards.
-               </p>
-                  <p className="text-center text-gray-400 text-sm">
-                   built with <span className="text-red-500 text-lg">❤</span> during ETH Denver<br/>
-                   Just Frame It finalist!<br/>
-                   Proudly built on Base 🔵 💙
-                 </p> 
-               </div>
+                    
+                    <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg">
+                      <p className={`text-2xs text-gray-300 text-center mb-1 ${protoMono.className}`}>
+                        Track and prove your healthy habits with wearables and onchain attestations, climb the Farcaster leaderboard and earn rewards.
+                      </p>
+                      <p className="text-center text-gray-400 text-sm">
+                        built with <span className="text-red-500 text-lg">❤</span> during ETH Denver<br/>
+                        Just Frame It finalist!<br/>
+                        Proudly built on Base 🔵 💙
+                      </p> 
+                    </div>
                   </div>
                 </div>
               </div>
