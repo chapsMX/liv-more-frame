@@ -46,3 +46,6 @@ db-structure.json
 init.sql
 .cursor/scratchpad.md
 .cursor/
+
+src/app/.well-known/walletconnect.txt
+src/app/.well-known/farcaster.json/route.ts

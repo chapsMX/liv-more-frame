@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useUser } from '../context/UserContext';
 import { protoMono } from '../styles/fonts';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { ShareIcon } from '@/styles/svg';
 
 type Challenge = {

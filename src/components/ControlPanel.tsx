@@ -6,7 +6,7 @@ import { useUser } from '../context/UserContext';
 import DGModal from './DGModal';
 import { validateGoals } from '@/constants/goals';
 import Image from 'next/image';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { useRouter } from 'next/navigation';
 import { isAuthorizedForTesting } from '@/utils/auth';
 

@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userFid = searchParams.get('user_fid');
     const targetDate = searchParams.get('date'); // ✅ NEW: Permitir fecha específica
+    const dateType = searchParams.get('date_type'); // ✅ NEW: Permitir especificar today/yesterday
 
     if (!userFid) {
       return NextResponse.json(
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log('🔍 [Health Data V2] Obteniendo datos optimizados para usuario:', userFid);
+    console.log('🔍 [Health Data V2] Obteniendo datos optimizados para usuario:', userFid, 'dateType:', dateType);
 
     // Obtener timezone del usuario para calcular fechas correctamente
     const userTimezoneData = await sql`
@@ -25,14 +26,24 @@ export async function GET(request: Request) {
     
     const userTimezone = userTimezoneData[0]?.timezone || 'UTC';
     
-    // ✅ CHANGED: Calcular "yesterday" por defecto en lugar de "today"
+    // ✅ UPDATED: Calcular fecha según date_type
     const now = new Date();
     let userTargetDate: string;
+    let actualDateType: string;
     
     if (targetDate) {
       // Si se especifica una fecha, usarla
       userTargetDate = targetDate;
+      actualDateType = 'specific';
       console.log('🗓️ [Health Data V2] Usando fecha específica:', userTargetDate);
+    } else if (dateType === 'today') {
+      // ✅ NEW: Calcular HOY en el timezone del usuario
+      userTargetDate = new Intl.DateTimeFormat('en-CA', { 
+        timeZone: userTimezone 
+      }).format(now);
+      actualDateType = 'today';
+      console.log('🕐 [Health Data V2] Timezone del usuario:', userTimezone);
+      console.log('🗓️ [Health Data V2] Fecha objetivo (HOY):', userTargetDate);
     } else {
       // Por defecto, usar AYER en el timezone del usuario
       const yesterday = new Date(now);
@@ -41,6 +52,7 @@ export async function GET(request: Request) {
       userTargetDate = new Intl.DateTimeFormat('en-CA', { 
         timeZone: userTimezone 
       }).format(yesterday);
+      actualDateType = 'yesterday';
       
       console.log('🕐 [Health Data V2] Timezone del usuario:', userTimezone);
       console.log('🗓️ [Health Data V2] Fecha objetivo (AYER):', userTargetDate);
@@ -157,7 +169,7 @@ export async function GET(request: Request) {
       user_fid: userFid,
       table_version: 'v2_daily_activities',
       target_date: userTargetDate, // ✅ NEW: Indicar qué fecha se está mostrando
-      date_type: targetDate ? 'specific' : 'yesterday', // ✅ NEW: Indicar tipo de fecha
+      date_type: actualDateType, // ✅ NEW: Indicar tipo de fecha
       daily_metrics: {
         steps: dailyMetrics.steps || 0,
         calories: dailyMetrics.calories || 0,
@@ -183,7 +195,7 @@ export async function GET(request: Request) {
       }
     };
 
-    console.log('✅ [Health Data V2] Datos optimizados obtenidos exitosamente desde v2_daily_activities (AYER por defecto)');
+    console.log(`✅ [Health Data V2] Datos optimizados obtenidos exitosamente desde v2_daily_activities (${actualDateType.toUpperCase()}):`, userTargetDate);
     return NextResponse.json(response);
 
   } catch (error) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useUser } from '../context/UserContext';
 import { useState, useEffect } from 'react';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 // Define the Attestation type based on the user_attestations table schema
 interface Attestation {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useUser } from '../context/UserContext';
 import { useState, useEffect } from 'react';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 const ADMIN_FIDS = [20701, 348971, 1020677];
 

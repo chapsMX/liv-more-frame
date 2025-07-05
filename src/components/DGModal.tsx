@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { protoMono } from '../styles/fonts';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg/index';
 import { MIN_GOALS, validateGoals } from '@/constants/goals';
-import { sdk } from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { useUser } from '../context/UserContext';
 
 interface GoalsModalProps {

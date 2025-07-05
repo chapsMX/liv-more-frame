@@ -8,15 +8,9 @@ import { useRouter } from 'next/navigation';
 import { ControlPanel } from './ControlPanel';
 import DGModal from './DGModal';
 import MintModal from './MintModal';
-import { sdk } from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg';
 
-// Helper para calcular fecha de finalización (comentado porque no se usa actualmente)
-// function getEndDate(startDate: string, durationDays: number) {
-//   const start = new Date(startDate);
-//   start.setDate(start.getDate() + durationDays);
-//   return start.toLocaleDateString();
-// }
 
 export default function DashboardInicial() {
   const { userState, setUserState } = useUser();
@@ -34,6 +28,13 @@ export default function DashboardInicial() {
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [dailyMetrics, setDailyMetrics] = useState({
+    steps: 0,
+    calories: 0,
+    sleep: 0
+  });
+
+  // State para métricas del día de HOY (separado de dailyMetrics que es de ayer)
+  const [todayMetrics, setTodayMetrics] = useState({
     steps: 0,
     calories: 0,
     sleep: 0
@@ -66,6 +67,9 @@ export default function DashboardInicial() {
   });
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
+  // State para acordeón de actividad de hoy
+  const [showTodayActivity, setShowTodayActivity] = useState(false);
+
   // Interface para LeaderboardEntry
   interface LeaderboardEntry {
     rank: number;
@@ -88,11 +92,6 @@ export default function DashboardInicial() {
     points_value?: number;
     is_official: boolean;
   }
-
-
-
-  // ❌ REMOVED: saveDailyActivity function - webhook handles this automatically
-
   // Función para sincronizar challenges activos del usuario
   const syncUserChallenges = useCallback(async (userFid: number | string, date: string) => {
     try {
@@ -117,8 +116,6 @@ export default function DashboardInicial() {
       console.error('❌ Error calling challenge sync:', error);
     }
   }, []);
-
-
 
   const checkConnection = useCallback(async () => {
     try {
@@ -333,6 +330,45 @@ export default function DashboardInicial() {
     }
   }, [initialCheckDone, userState.userFid, userState.connectedProvider, userState.timezone, syncUserChallenges]);
 
+  // ✅ NEW: Función para obtener datos de HOY (today)
+  const fetchTodayHealthData = useCallback(async () => {
+    if (!userState.userFid || !userState.connectedProvider) return;
+
+    try {
+      console.log('🔄 [TODAY] Obteniendo datos de salud del día de hoy para usuario:', userState.userFid);
+      
+      // Llamar a la API con parámetro para obtener datos de HOY
+      const response = await fetch(`/api/users/health-data?user_fid=${userState.userFid}&date_type=today`);
+      
+      if (!response.ok) {
+        console.error('❌ Error obteniendo datos de hoy:', await response.text());
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Actualizar métricas del día de hoy
+        setTodayMetrics(data.daily_metrics);
+
+        console.log('✅ [TODAY] Datos de hoy actualizados exitosamente:', {
+          today: data.daily_metrics,
+          target_date: data.target_date,
+          date_type: data.date_type
+        });
+      }
+    } catch (error) {
+      console.error('❌ [TODAY] Error obteniendo datos de hoy:', error);
+    }
+  }, [userState.userFid, userState.connectedProvider]);
+
+  // ✅ NEW: useEffect para obtener datos de HOY
+  useEffect(() => {
+    if (initialCheckDone && userState.connectedProvider) {
+      fetchTodayHealthData();
+    }
+  }, [initialCheckDone, fetchTodayHealthData]);
+
   const handleSaveGoals = async (goals: { calories: number; steps: number; sleep: number }) => {
     try {
       const response = await fetch('/api/users/save-goals', {
@@ -356,7 +392,7 @@ export default function DashboardInicial() {
     }
   };
 
-   function calculateDailyProgress() {
+/*    function calculateDailyProgress() {
     // Usar userGoals de la API optimizada
     const caloriesProgress = (dailyMetrics.calories / userGoals.calories_goal) * 100;
     const stepsProgress = (dailyMetrics.steps / userGoals.steps_goal) * 100;
@@ -364,7 +400,7 @@ export default function DashboardInicial() {
     
     const averageProgress = Math.round((caloriesProgress + stepsProgress + sleepProgress) / 3);
     return Math.min(averageProgress, 100); // Aseguramos que no exceda el 100%
-  }
+  } 
 
   // ✅ NEW: Función para verificar si TODOS los objetivos están completados
   function areAllGoalsCompleted() {
@@ -373,7 +409,7 @@ export default function DashboardInicial() {
     const sleepCompleted = (dailyMetrics.sleep / userGoals.sleep_hours_goal) >= 1;
     
     return caloriesCompleted && stepsCompleted && sleepCompleted;
-  } 
+  } */
 
     const handleShare = async () => {
     try {
@@ -681,8 +717,78 @@ export default function DashboardInicial() {
             <div className="flex flex-col items-center justify-center space-y-2 p-2">
               {/* Fila cero */}
               <h1 className={`text-2xl font-bold text-white mb-0 ${protoMono.className}`}>
-                Welcome to Liv More!
+                Liv More 2.0
               </h1>
+
+              {/* Acordeón de Today's Activity */}
+              <div className="w-full max-w-4xl">
+                <button
+                  onClick={() => setShowTodayActivity(!showTodayActivity)}
+                  className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 border-gray-700 bg-gray-800 hover:bg-gray-700 transition-all duration-300 ${protoMono.className}`}
+                >
+                  <span className="text-white font-semibold">Todays Activity</span>
+                  <span className={`transform transition-transform duration-300 ${showTodayActivity ? 'rotate-180' : ''}`}>
+                    ⬇️
+                  </span>
+                </button>
+
+                {/* Sección expandible con estadísticas de hoy */}
+                {showTodayActivity && (
+                  <div className="mt-3 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg space-y-3 transition-all duration-300 ease-in-out">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Steps de hoy */}
+                      <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                        <div className="flex items-center">
+                          <StepsIcon className="w-8 h-8 text-green-500 mr-3" />
+                          <div>
+                            <p className="text-gray-400 text-sm">Steps</p>
+                            <p className={`text-white text-xl font-bold ${protoMono.className}`}>
+                              {todayMetrics.steps.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Calories de hoy */}
+                      <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                        <div className="flex items-center">
+                          <CaloriesIcon className="w-8 h-8 text-orange-500 mr-3" />
+                          <div>
+                            <p className="text-gray-400 text-sm">Calories</p>
+                            <p className={`text-white text-xl font-bold ${protoMono.className}`}>
+                              {todayMetrics.calories.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Fecha de hoy */}
+                    <div className="text-center border-t border-gray-700 pt-3">
+                      <p className={`text-sm text-gray-400 ${protoMono.className}`}>
+                        {userState.timezone ? (() => {
+                          const today = new Date();
+                          return today.toLocaleDateString('en-US', { 
+                            timeZone: userState.timezone,
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                        })() :
+                        new Date().toLocaleDateString('en-US', { 
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
                {/* fila 2 - Leaderboards */}
                <div className="mt-2 w-full max-w-6xl mb-0">
                  <div className={`relative z-10 space-y-2 mb-0 ${protoMono.className}`}>
@@ -801,7 +907,7 @@ export default function DashboardInicial() {
              {/* fila 3 - Yesterday's Activity */}
              <hr></hr>
               <h1 className={`text-xl font-bold text-white mb-0 ${protoMono.className}`}>
-                Mintable Activity
+                Yesterdays Activity
               </h1>
               <div className={`text-sm text-gray-400 mb-4 ${protoMono.className}`}>
                 {userState.timezone ? (() => {
@@ -908,7 +1014,7 @@ export default function DashboardInicial() {
                       className="w-full max-w-md mx-auto py-3 px-6 rounded-xl border-2 border-[#00FF94] bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300 ease-in-out transform hover:scale-105"
                     >
                       <span className={`text-sm font-bold text-[#00FF94] ${protoMono.className}`}>
-                        🏆 You achieved some of your goals yesterday, mint an attestation 🏆
+                        🏆 Mint an attestation of your achievements 🏆
                       </span>
                     </button>
                   </div>

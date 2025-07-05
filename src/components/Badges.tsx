@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Badge, CreateBadgeRequest } from '../types/badge';
 import { useUser } from '../context/UserContext';
-import sdk from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 const ADMIN_FIDS = [20701, 348971, 1020677];
 

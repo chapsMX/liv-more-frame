@@ -225,8 +225,8 @@ export default function LeaderboardPage() {
   // Load user profile
   useEffect(() => {
     const loadUserProfile = async () => {
-      const sdk = await import("@farcaster/frame-sdk");
-      const context = await sdk.sdk.context;
+              const { sdk } = await import("@farcaster/miniapp-sdk");
+        const context = await sdk.context;
       if (context.user?.pfpUrl) {
         setPfpUrl(context.user.pfpUrl);
       }

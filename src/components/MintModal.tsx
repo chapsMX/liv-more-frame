@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { protoMono } from '../styles/fonts';
-import { useUser } from '../context/UserContext';
 import { CaloriesIcon, StepsIcon, SleepIcon } from '../styles/svg';
-import { sdk } from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { base } from 'wagmi/chains';
+import type { Connector } from 'wagmi';
 import { submitDelegatedAttestation } from '../utils/attestations';
 
 interface MintModalProps {
@@ -42,7 +42,6 @@ export default function MintModal({
   createdAttestations,
   onAttestationCreated 
 }: MintModalProps) {
-  const { userState } = useUser();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
@@ -112,6 +111,7 @@ export default function MintModal({
           break;
       }
       
+      // Use EAS Scanner for attestation UID
       const formattedUID = attestationUID.toLowerCase();
       const url = `https://base.easscan.org/attestation/view/${formattedUID}`;
       console.log('Sharing attestation with URL:', url);
@@ -137,7 +137,7 @@ export default function MintModal({
         throw new Error('User not found');
       }
 
-      if (!userState.ethAddress) {
+      if (!address) {
         throw new Error('Wallet address not found');
       }
 
@@ -156,7 +156,7 @@ export default function MintModal({
         fid: context.user.fid,
         name: context.user.username || "",
         display_name: context.user.displayName || context.user.username || "",
-        wallet: userState.ethAddress,
+        wallet: address,
         metric_type: metricType,
         goal_value: Math.floor(goalValue),
         actual_value: Math.max(1, Math.floor(currentValue)),
@@ -167,7 +167,7 @@ export default function MintModal({
         image_url
       };
 
-      // 3. Submit delegated attestation
+      // 3. Submit delegated attestation with EAS SDK + Farcaster
       const attestationUID = await submitDelegatedAttestation(attestationPayload);
       console.log('Attestation UID:', attestationUID);
 
@@ -180,7 +180,7 @@ export default function MintModal({
             user_fid: context.user.fid,
             name: context.user.username || "",
             display_name: context.user.displayName || context.user.username || "",
-            wallet: userState.ethAddress,
+            wallet: address,
             metric_type: metricType,
             goal_value: Math.floor(goalValue),
             actual_value: Math.max(1, Math.floor(currentValue)),
@@ -253,20 +253,26 @@ export default function MintModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md border-2 border-gray-700">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className={`text-2xl font-bold text-white ${protoMono.className}`}>
-            Mint Attestations
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+              <div className="bg-gray-900 rounded-xl p-6 w-full max-w-md border-2 border-gray-700">
+          <div className="relative mb-6">
+            <button
+              onClick={onClose}
+              className="absolute top-0 right-0 text-gray-400 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className={`${protoMono.className}`}>
+              <h1 className={`text-xl font-bold text-white mb-2 text-center ${protoMono.className}`}>
+                Attest your activity onchain
+              </h1>
+              <p className={`text-sm text-gray-400 ${protoMono.className}`}>
+                Attestations may not work reliably with the native Farcaster wallet.
+                <br/>
+                It is recommended to use an external wallet on desktop for a smoother experience.</p>
+            </div>
+          </div>
 
         {/* Wallet Connection Section */}
         <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
@@ -285,20 +291,20 @@ export default function MintModal({
               >
                 Disconnect
               </button>
-                         ) : (
-               <div className="flex flex-col space-y-2">
-                 {connectors.map((connector) => (
-                   <button
-                     key={connector.uid}
-                     onClick={() => connect({ connector })}
-                     disabled={!connector.id}
-                     className={`px-3 py-2 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded transition-colors disabled:opacity-50 ${protoMono.className} w-full`}
-                   >
-                     {connector.name}
-                   </button>
-                 ))}
-               </div>
-             )}
+            ) : (
+              <div className="flex flex-col space-y-2">
+                {connectors.map((connector: Connector) => (
+                  <button
+                    key={connector.uid}
+                    onClick={() => connect({ connector })}
+                    disabled={!connector.id}
+                    className={`px-3 py-2 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded transition-colors disabled:opacity-50 ${protoMono.className} w-full`}
+                  >
+                    {connector.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
           {chain && chain.id !== base.id && (
@@ -308,25 +314,7 @@ export default function MintModal({
           )}
         </div>
 
-        {!isConnected ? (
-          <div className="text-center py-8">
-            <p className={`text-gray-400 mb-4 ${protoMono.className}`}>
-              Connect your wallet to mint attestations
-            </p>
-            <div className="flex flex-col space-y-3 max-w-xs mx-auto">
-              {connectors.map((connector) => (
-                <button
-                  key={connector.uid}
-                  onClick={() => connect({ connector })}
-                  disabled={!connector.id}
-                  className={`px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50 ${protoMono.className} w-full`}
-                >
-                  {connector.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : availableMetrics.length === 0 ? (
+        {availableMetrics.length === 0 ? (
           <div className="text-center py-8">
             <p className={`text-gray-400 ${protoMono.className}`}>
               No attestations available to mint

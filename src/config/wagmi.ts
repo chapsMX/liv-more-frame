@@ -12,18 +12,20 @@ export const config = createConfig({
     farcasterMiniApp(),
     metaMask(),
     coinbaseWallet({
-      appName: 'LivMore',
-      appLogoUrl: 'https://livmore.app/icon.png',
+      appName: 'Liv More',
+      appLogoUrl: 'https://app.livmore.app/icon.png',
     }),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '',
-      metadata: {
-        name: 'LivMore',
-        description: 'Turn healthy habits into rewards',
-        url: 'https://livmore.app',
-        icons: ['https://livmore.app/icon.png'],
-      },
-    }),
+    ...(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ? [
+      walletConnect({
+        projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+        metadata: {
+          name: 'Liv More',
+          description: 'Turn healthy habits into rewards',
+          url: 'https://app.livmore.app',
+          icons: ['https://livmore.app/icon.png'],
+        },
+      })
+    ] : []),
   ]
 })
 

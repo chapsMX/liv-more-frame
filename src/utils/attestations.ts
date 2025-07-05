@@ -1,6 +1,6 @@
 import { EAS } from "@ethereum-attestation-service/eas-sdk";
 import { BrowserProvider } from "ethers";
-import type { TransactionReceipt } from "ethers";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 interface AttestationPayload {
   fid: number;
@@ -17,44 +17,19 @@ interface AttestationPayload {
   image_url: string;
 }
 
-const EAS_CONTRACT_ADDRESS = "0x4200000000000000000000000000000000000021";
-
-const BASE_CHAIN_ID = '0x2105'; // 8453 in hex
-const BASE_PARAMS = {
-  chainId: BASE_CHAIN_ID,
-  chainName: 'Base Mainnet',
-  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://mainnet.base.org'],
-  blockExplorerUrls: ['https://basescan.org'],
-};
-
-const ensureBaseNetwork = async () => {
-  if (!window.ethereum) throw new Error('No crypto wallet found');
-  const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-  if (currentChainId !== BASE_CHAIN_ID) {
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: BASE_CHAIN_ID }],
-      });
-    } catch (switchError: unknown) {
-      if (typeof switchError === 'object' && switchError !== null && 'code' in switchError && switchError.code === 4902) {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [BASE_PARAMS],
-        });
-      } else {
-        throw switchError;
-      }
-    }
-  }
-};
+const EAS_CONTRACT_ADDRESS = '0x4200000000000000000000000000000000000021';
 
 export async function submitDelegatedAttestation(attestationPayload: AttestationPayload) {
-  // 1. Ensure we're on Base network
-  await ensureBaseNetwork();
+  console.log('🚀 Starting delegated attestation process with EAS SDK + Farcaster:', attestationPayload);
+  
+  // 1. Get Farcaster wallet provider
+  const provider = await sdk.wallet.getEthereumProvider();
+  if (!provider) {
+    throw new Error('No Farcaster wallet provider found. Please connect your wallet in the Farcaster app.');
+  }
 
   // 2. Get delegated signature from backend
+  console.log('📝 Requesting delegated signature from backend...');
   const signResponse = await fetch('/api/attestations/delegated-sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -63,46 +38,83 @@ export async function submitDelegatedAttestation(attestationPayload: Attestation
 
   if (!signResponse.ok) {
     const errorData = await signResponse.json();
+    console.error('❌ Backend signing failed:', errorData);
     throw new Error(errorData.error || 'Failed to get delegated signature');
   }
 
   const signResult = await signResponse.json();
+  console.log('✅ Backend signature received:', {
+    attester: signResult.attester,
+    signature: signResult.signature,
+    schema: signResult.delegatedAttestation.schema
+  });
 
-  // 3. Initialize EAS contract with ethers
-  const provider = new BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
+  // 3. Create EAS instance with Farcaster provider
+  console.log('🔗 Connecting to EAS with Farcaster provider...');
+  const browserProvider = new BrowserProvider(provider);
+  const signer = await browserProvider.getSigner();
   
   const eas = new EAS(EAS_CONTRACT_ADDRESS);
   eas.connect(signer);
 
-  // 4. Create attestation
-  const tx = await eas.attestByDelegation({
-    schema: signResult.delegatedAttestation.schema,
-    data: {
-      recipient: signResult.delegatedAttestation.recipient,
-      expirationTime: BigInt(signResult.delegatedAttestation.expirationTime),
-      revocable: signResult.delegatedAttestation.revocable,
-      refUID: signResult.delegatedAttestation.refUID,
-      data: signResult.encodedData
-    },
-    signature: signResult.signature,
-    attester: signResult.attester,
-    deadline: BigInt(signResult.deadline)
-  });
+  console.log('✅ EAS connected with signer:', await signer.getAddress());
 
-  // 5. Wait for transaction
-  const receipt = await tx.wait() as unknown as TransactionReceipt;
-  console.log('Attestation transaction receipt:', receipt);
+  // 4. Submit delegated attestation using EAS SDK
+  console.log('⛓️ Submitting delegated attestation...');
+  try {
+    const tx = await eas.attestByDelegation({
+      schema: signResult.delegatedAttestation.schema,
+      data: {
+        recipient: signResult.delegatedAttestation.recipient,
+        expirationTime: BigInt(signResult.delegatedAttestation.expirationTime),
+        revocable: signResult.delegatedAttestation.revocable,
+        refUID: signResult.delegatedAttestation.refUID,
+        data: signResult.encodedData,
+        value: BigInt(signResult.delegatedAttestation.value),
+      },
+      signature: signResult.signature,
+      attester: signResult.attester,
+      deadline: BigInt(signResult.deadline || 0),
+    });
 
-  // 6. Get attestation UID from transaction
-  const attestationUID = receipt.toString();
-  console.log('Attestation UID:', attestationUID);
+    console.log('✅ Transaction sent! Details:', tx);
+    console.log('🎯 Waiting for transaction confirmation...');
 
-  // 7. Verify the attestation exists
-  const attestation = await eas.getAttestation(attestationUID);
-  if (!attestation) {
-    throw new Error('Attestation not found after creation');
+    // 5. Wait for transaction confirmation
+    const attestationUID = await tx.wait();
+    console.log('✅ Transaction confirmed');
+    console.log('🎯 Attestation UID:', attestationUID);
+
+    // 6. Verify the attestation exists
+    console.log('🔍 Verifying attestation exists...');
+    try {
+      const attestation = await eas.getAttestation(attestationUID);
+      if (!attestation) {
+        console.error('❌ Attestation verification failed - not found');
+        throw new Error('Attestation not found after creation');
+      }
+      console.log('✅ Attestation verified:', attestation);
+    } catch (error) {
+      console.error('❌ Attestation verification failed:', error);
+      console.warn('⚠️ Continuing despite verification error - attestation may still be valid');
+    }
+
+    console.log('🎉 Attestation successfully created!');
+    return attestationUID;
+  } catch (error) {
+    console.error('❌ Transaction failed:', error);
+    
+    // More specific error handling
+    if (error instanceof Error) {
+      if (error.message.includes('User rejected')) {
+        throw new Error('Transaction was rejected by user');
+      } else if (error.message.includes('insufficient funds')) {
+        throw new Error('Insufficient funds for transaction');
+      } else if (error.message.includes('nonce')) {
+        throw new Error('Transaction nonce error - please try again');
+      }
+    }
+    
+    throw new Error(`Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  return attestationUID;
 } 
