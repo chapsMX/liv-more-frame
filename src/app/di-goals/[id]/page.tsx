@@ -17,7 +17,7 @@ export async function generateMetadata({
     version: "next",
     imageUrl: imageUrl.toString(),
     button: {
-      title: "Accountability",
+      title: "Join Liv More & set yours!",
       action: {
         type: "launch_frame",
         name: "Join me",
@@ -29,9 +29,9 @@ export async function generateMetadata({
   };
 
   return {
-    title: "Accountability",
+    title: "Join Liv More & set yours!",
     openGraph: {
-      title: "Accountability",
+      title: "Join Liv More & set yours!",
       description: "Join me🚀",
       images: [{ url: imageUrl.toString() }],
     },

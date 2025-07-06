@@ -1256,7 +1256,7 @@ export default function DashboardInicial() {
                     
                     <div className="bg-gray-900 border-2 border-gray-700 rounded-xl p-2 flex flex-col items-center shadow-lg">
                       <p className={`text-2xs text-gray-300 text-center mb-1 ${protoMono.className}`}>
-                        Track and prove your healthy habits with wearables and onchain attestations, climb the Farcaster leaderboard and earn rewards.
+                        Track and prove your healthy habits with wearables and onchain attestations and climb the Farcaster leaderboard.
                       </p>
                       <p className="text-center text-gray-400 text-sm">
                         built with <span className="text-red-500 text-lg">❤</span> during ETH Denver<br/>
@@ -1284,6 +1284,7 @@ export default function DashboardInicial() {
               userGoals={userGoals}
               createdAttestations={createdAttestations}
               onAttestationCreated={handleAttestationCreated}
+              userTimezone={userState.timezone}
             />
           )}
         </>

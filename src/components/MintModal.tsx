@@ -32,6 +32,7 @@ interface MintModalProps {
     sleep: boolean;
   };
   onAttestationCreated: (metric: 'calories' | 'steps' | 'sleep') => void;
+  userTimezone?: string;
 }
 
 export default function MintModal({ 
@@ -40,7 +41,8 @@ export default function MintModal({
   dailyMetrics, 
   userGoals, 
   createdAttestations,
-  onAttestationCreated 
+  onAttestationCreated,
+  userTimezone
 }: MintModalProps) {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
@@ -77,6 +79,19 @@ export default function MintModal({
   const stepsimage = "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreidjr3w5yzdqhafqsaynss35kiwdqa4p42fkjpnjzdnx2thkubkxxq";
   const caloriesimage = "https://tan-leading-pelican-169.mypinata.cloud/ipfs/bafkreiatwphioasnrhctap2z4uh2zj2vsohxvwpyx7mpaufuwiu2blhm5y";
 
+  // ✅ FIXED: Calculate correct date for attestation (yesterday's date)
+  const getAttestationDate = () => {
+    return userTimezone ? (() => {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      return new Intl.DateTimeFormat('en-CA', { timeZone: userTimezone }).format(yesterdayDate);
+    })() : (() => {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      return yesterdayDate.toISOString().split('T')[0];
+    })();
+  };
+
   const attestationShare = async (metricType: 'steps' | 'calories' | 'sleep', attestationUID: string) => {
     try {
       let achievementText = '';
@@ -91,20 +106,20 @@ export default function MintModal({
       switch (metricType) {
         case 'steps':
           achievementText = `🥾 ${currentValue} steps stored onchain! 🥾\n` +
-            `Walked ${currentValue} steps today, my goal was ${goalValue}.\n` +
+            `Walked ${currentValue} steps yesterday, my goal was ${goalValue}.\n` +
             `One foot in front of the other, and now it's onchain.\n` +
             `Attested on @base. Let's keep moving 💪🧬\n` +
             `@livmore`;
           break;
         case 'calories':
           achievementText = `🔥 ${currentValue} calories burned & stored onchain! 🔥\n` +
-            `Burned ${currentValue} kcal out of my ${goalValue} kcal goal.\n` +
+            `Burned ${currentValue} kcal yesterday out of my ${goalValue} kcal goal.\n` +
             `Pushed through and now my effort is stored forever, attested on @base 🧬 💪\n` +
             `@livmore`;
           break;
         case 'sleep':
           achievementText = `😴 ${currentValue}hrs slept and stored onchain 😴\n` +
-            `Slept ${currentValue} hours, beat my ${goalValue} target.\n` +
+            `Slept ${currentValue} hours last night, beat my ${goalValue} target.\n` +
             `Rested, recharged, and now… attested.\n` +
             `Proof of sleep on @base 🛌🧬\n` +
             `@livmore`;
@@ -172,6 +187,7 @@ export default function MintModal({
       console.log('Attestation UID:', attestationUID);
 
       // 4. Save attestation to database
+      // ✅ FIXED: Using getAttestationDate() to ensure correct date (yesterday's data)
       try {
         const saveResponse = await fetch('/api/attestations/save-attestation', {
           method: 'POST',
@@ -190,7 +206,7 @@ export default function MintModal({
             description: `Achieved ${currentValue} ${metricType} out of ${goalValue} goal`,
             image_url: image_url,
             attestation_uid: attestationUID,
-            date: new Date().toISOString().split('T')[0]
+            date: getAttestationDate()
           }),
         });
 

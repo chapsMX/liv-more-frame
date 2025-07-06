@@ -7,7 +7,7 @@ const frame = {
   version: "next",
   imageUrl: `${appUrl}/frameImage.png`,
   button: {   
-    title: "Join Liv More Beta Test",
+    title: "Climb the activity leaderboard!",
     action: {
       type: "launch_frame",
       name: "Liv More",
