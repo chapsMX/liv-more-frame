@@ -1,11 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { MiniAppProvider } from "@neynar/react";
 
 const LivMore = dynamic(() => import("../components/LivMore"), {
   ssr: false,
 });
 
 export default function App() {
-  return <LivMore />;
+  return (
+    <MiniAppProvider>
+      <LivMore />
+    </MiniAppProvider>
+  );
 }
