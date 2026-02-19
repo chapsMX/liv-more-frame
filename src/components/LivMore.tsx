@@ -101,11 +101,11 @@ export default function LivMore() {
       }
     } catch (e) {
       if (e instanceof AddMiniApp.RejectedByUser) {
-        setAddError("Rechazado por el usuario");
+        setAddError("Rejected by user");
       } else if (e instanceof AddMiniApp.InvalidDomainManifest) {
-        setAddError("Manifest de dominio inválido");
+        setAddError("Invalid domain manifest");
       } else {
-        setAddError(e instanceof Error ? e.message : "Error al añadir miniapp");
+        setAddError(e instanceof Error ? e.message : "Error adding miniapp");
       }
     }
   };
@@ -115,7 +115,7 @@ export default function LivMore() {
     try {
       const provider = await sdk.wallet.getEthereumProvider();
       if (!provider) {
-        setWalletError("No hay proveedor de billetera disponible");
+        setWalletError("No wallet provider available");
         return;
       }
       const accounts = (await provider.request({
@@ -124,16 +124,16 @@ export default function LivMore() {
       if (accounts?.[0]) {
         setWalletAddress(accounts[0]);
       } else {
-        setWalletError("No se obtuvo ninguna cuenta");
+        setWalletError("No account found");
       }
     } catch (e) {
-      setWalletError(e instanceof Error ? e.message : "Error al conectar billetera");
+      setWalletError(e instanceof Error ? e.message : "Error connecting wallet");
     }
   };
 
   if (!sdkReady || isLoading) {
     return (
-      <div className="min-h-screen bg-black text-white font-mono flex items-center justify-center">
+      <div className={`min-h-screen bg-black text-white flex items-center justify-center ${protoMono.className}`}>
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin" />
           <p className={protoMono.className}>Loading...</p>
@@ -143,28 +143,27 @@ export default function LivMore() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
+    <div className={`min-h-screen bg-black text-white flex flex-col ${protoMono.className}`}>
+      <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2">
         <Image
           src="/livMore_w.png"
           alt="Liv More"
-          width={120}
-          height={120}
+          width={80}
+          height={80}
           priority
         />
-
-        <h1 className={`text-2xl font-bold ${protoMono.className}`}>Liv More</h1>
-        <p className="text-gray-400 text-center text-sm max-w-sm">
-          Gamifying wellness with wearables, blockchain attestations and social challenges.
+        <h1 className={`text-2xl font-bold ${protoMono.className}`}>LivMore</h1>
+        <p className={`text-gray-400 text-center text-sm max-w-sm ${protoMono.className}`}>
+          Tracking your healthy habits 👟👟👟 
         </p>
 
         {/* User info (from Neynar or SDK context) */}
         <section className="w-full max-w-sm space-y-2">
           <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            Usuario
+            User:
           </h2>
           {context?.user && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-900 border border-gray-800">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-gray-900 border border-gray-800">
               {(neynarUser?.pfp_url ?? context.user.pfpUrl) ? (
                 <Image
                   src={neynarUser?.pfp_url ?? context.user.pfpUrl ?? ""}
@@ -175,7 +174,7 @@ export default function LivMore() {
                   unoptimized
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm">
+                <div className={`w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm ${protoMono.className}`}>
                   ?
                 </div>
               )}
@@ -183,69 +182,70 @@ export default function LivMore() {
                 <p className={`font-semibold truncate ${protoMono.className}`}>
                   {neynarUser?.display_name ?? context.user.displayName ?? neynarUser?.username ?? context.user.username ?? `FID ${context.user.fid}`}
                 </p>
-                <p className="text-gray-500 text-xs truncate">
+                <p className={`text-gray-500 text-xs truncate ${protoMono.className}`}>
                   @{neynarUser?.username ?? context.user.username ?? "—"}
                 </p>
-                {neynarUser?.custody_address && (
-                  <p className="text-gray-600 text-xs truncate mt-0.5" title={neynarUser.custody_address}>
-                    {neynarUser.custody_address.slice(0, 6)}…{neynarUser.custody_address.slice(-4)}
-                  </p>
-                )}
               </div>
             </div>
           )}
           {!context?.user && (
-            <p className="text-gray-500 text-sm">No hay usuario de Farcaster en este contexto.</p>
+            <p className={`text-gray-500 text-sm ${protoMono.className}`}>No user found in this context.</p>
           )}
         </section>
 
         {/* Wallet */}
         <section className="w-full max-w-sm space-y-2">
           <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            Billetera
+            Wallet
           </h2>
           {walletAddress ? (
-            <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 break-all text-sm text-gray-300">
+            <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 break-all text-sm text-gray-300 ${protoMono.className}`}>
               {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
             </div>
           ) : (
-            <Boton onClick={handleConnectWallet} className="w-full py-3">
-              Conectar billetera
+            <Boton onClick={handleConnectWallet} className="w-full py-2">
+              Connect wallet
             </Boton>
           )}
-          {walletError && <p className="text-red-400 text-xs">{walletError}</p>}
+          {walletError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{walletError}</p>}
         </section>
 
         {/* Install miniapp + notifications */}
         <section className="w-full max-w-sm space-y-2">
           <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            Miniapp y notificaciones
+            Miniapp and notifications
           </h2>
           {added ? (
-            <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300">
-              Miniapp instalada
+            <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300 ${protoMono.className}`}>
+              Miniapp installed
               {notificationDetails?.token && (
-                <p className="text-xs text-gray-500 mt-1">Notificaciones habilitadas</p>
+                <p className={`text-xs text-gray-500 mt-1 ${protoMono.className}`}>Notifications enabled</p>
               )}
             </div>
           ) : (
-            <Boton onClick={handleAddMiniApp} className="w-full py-3">
-              Instalar miniapp y habilitar notificaciones
+            <Boton onClick={handleAddMiniApp} className="w-full py-2">
+              Install miniapp and enable notifications
             </Boton>
           )}
-          {addError && <p className="text-red-400 text-xs">{addError}</p>}
+          {addError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{addError}</p>}
         </section>
 
         {/* Placeholder for the full app */}
-        <section className="w-full max-w-sm mt-4 p-6 rounded-xl border-2 border-dashed border-gray-700 text-center">
+        <section className="w-full max-w-sm mt-4 p-2 rounded-xl border-2 border-dashed border-gray-700 text-center">
           <p className={`text-gray-500 text-sm ${protoMono.className}`}>
-            Placeholder — La app completa se construirá aquí.
+            <strong className="text-gray-400">Wen token:</strong> Soon, via Clanker
+          </p>
+          <p className={`text-gray-500 text-sm mt-1 ${protoMono.className}`}>
+            <strong className="text-gray-400">Supported Devices:</strong> Garmin, Polar
+          </p>
+          <p className={`text-gray-500 text-sm mt-1 ${protoMono.className}`}>
+            <strong className="text-gray-400">What:</strong> 👟👟👟
           </p>
         </section>
       </main>
 
       <footer className="w-full py-4 text-center">
-        <p className="text-gray-500 text-sm">
+        <p className={`text-gray-500 text-sm ${protoMono.className}`}>
           built with <span className="text-red-500">❤</span> during ETH Denver
         </p>
       </footer>
