@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { sdk } from "@farcaster/miniapp-sdk";
 import type { Context } from "@farcaster/miniapp-core";
 import { AddMiniApp } from "@farcaster/miniapp-core";
 import Image from "next/image";
-import { Boton } from "../styles/ui/boton";
 import { protoMono } from "../styles/fonts";
 
 function HamburgerIcon({ className }: { className?: string }) {
@@ -31,13 +30,10 @@ export default function LivMore() {
   const router = useRouter();
   const [context, setContext] = useState<Context.MiniAppContext | null>(null);
   const [neynarUser, setNeynarUser] = useState<NeynarUser | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
-  const [notificationDetails, setNotificationDetails] = useState<{ token?: string; url?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sdkReady, setSdkReady] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [walletError, setWalletError] = useState<string | null>(null);
+  const hasAutoPromptedAddMiniAppRef = useRef(false);
 
   const fetchNeynarUser = useCallback(async (fid: number) => {
     try {
@@ -60,31 +56,21 @@ export default function LivMore() {
         if (!mounted) return;
         setContext(ctx);
         setAdded(ctx.client.added);
-        if (ctx.client.notificationDetails) {
-          setNotificationDetails(ctx.client.notificationDetails);
-        }
         if (ctx.user?.fid) {
           await fetchNeynarUser(ctx.user.fid);
         }
 
-        sdk.on("miniAppAdded", ({ notificationDetails: details }) => {
+        sdk.on("miniAppAdded", () => {
           setAdded(true);
-          if (details) setNotificationDetails(details);
-          setAddError(null);
         });
-        sdk.on("miniAppAddRejected", ({ reason }) => {
-          setAddError(reason === "rejected_by_user" ? "Añadir miniapp rechazado" : "Error de manifest");
+        sdk.on("miniAppAddRejected", () => {
+          // Rejected or manifest error; Control Panel shows status if user navigates there
         });
         sdk.on("miniAppRemoved", () => {
           setAdded(false);
-          setNotificationDetails(null);
         });
-        sdk.on("notificationsEnabled", ({ notificationDetails: details }) => {
-          if (details) setNotificationDetails(details);
-        });
-        sdk.on("notificationsDisabled", () => {
-          setNotificationDetails(null);
-        });
+        sdk.on("notificationsEnabled", () => {});
+        sdk.on("notificationsDisabled", () => {});
 
         await sdk.actions.ready({});
         if (mounted) setSdkReady(true);
@@ -103,45 +89,22 @@ export default function LivMore() {
     };
   }, [fetchNeynarUser]);
 
-  const handleAddMiniApp = async () => {
-    setAddError(null);
-    try {
-      const result = await sdk.actions.addMiniApp();
-      if (result.notificationDetails) {
-        setNotificationDetails(result.notificationDetails);
+  // Auto-open add miniapp menu when not added (like buttlet.tsx)
+  useEffect(() => {
+    if (!sdkReady || added || hasAutoPromptedAddMiniAppRef.current) return;
+    hasAutoPromptedAddMiniAppRef.current = true;
+    sdk.actions
+      .addMiniApp()
+      .then(() => {
         setAdded(true);
-      }
-    } catch (e) {
-      if (e instanceof AddMiniApp.RejectedByUser) {
-        setAddError("Rejected by user");
-      } else if (e instanceof AddMiniApp.InvalidDomainManifest) {
-        setAddError("Invalid domain manifest");
-      } else {
-        setAddError(e instanceof Error ? e.message : "Error adding miniapp");
-      }
-    }
-  };
-
-  const handleConnectWallet = async () => {
-    setWalletError(null);
-    try {
-      const provider = await sdk.wallet.getEthereumProvider();
-      if (!provider) {
-        setWalletError("No wallet provider available");
-        return;
-      }
-      const accounts = (await provider.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-      if (accounts?.[0]) {
-        setWalletAddress(accounts[0]);
-      } else {
-        setWalletError("No account found");
-      }
-    } catch (e) {
-      setWalletError(e instanceof Error ? e.message : "Error connecting wallet");
-    }
-  };
+      })
+      .catch((e: unknown) => {
+        if (e instanceof AddMiniApp.RejectedByUser) {
+          return;
+        }
+        // On other errors, user can retry from Control Panel
+      });
+  }, [sdkReady, added]);
 
   if (!sdkReady || isLoading) {
     return (
@@ -194,79 +157,6 @@ export default function LivMore() {
         <p className={`text-gray-400 text-center text-sm max-w-sm ${protoMono.className}`}>
           Tracking your healthy habits 👟👟👟 
         </p>
-
-        {/* User info (from Neynar or SDK context) */}
-        <section className="w-full max-w-sm space-y-2">
-          <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            User:
-          </h2>
-          {context?.user && (
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-gray-900 border border-gray-800">
-              {(neynarUser?.pfp_url ?? context.user.pfpUrl) ? (
-                <Image
-                  src={neynarUser?.pfp_url ?? context.user.pfpUrl ?? ""}
-                  alt="Avatar"
-                  width={40}
-                  height={40}
-                  className="rounded-full border border-gray-700"
-                  unoptimized
-                />
-              ) : (
-                <div className={`w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm ${protoMono.className}`}>
-                  ?
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className={`font-semibold truncate ${protoMono.className}`}>
-                  {neynarUser?.display_name ?? context.user.displayName ?? neynarUser?.username ?? context.user.username ?? `FID ${context.user.fid}`}
-                </p>
-                <p className={`text-gray-500 text-xs truncate ${protoMono.className}`}>
-                  @{neynarUser?.username ?? context.user.username ?? "—"}
-                </p>
-              </div>
-            </div>
-          )}
-          {!context?.user && (
-            <p className={`text-gray-500 text-sm ${protoMono.className}`}>No user found in this context.</p>
-          )}
-        </section>
-
-        {/* Wallet */}
-        <section className="w-full max-w-sm space-y-2">
-          <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            Wallet
-          </h2>
-          {walletAddress ? (
-            <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 break-all text-sm text-gray-300 ${protoMono.className}`}>
-              {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
-            </div>
-          ) : (
-            <Boton onClick={handleConnectWallet} className="w-full py-2">
-              Connect wallet
-            </Boton>
-          )}
-          {walletError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{walletError}</p>}
-        </section>
-
-        {/* Install miniapp + notifications */}
-        <section className="w-full max-w-sm space-y-2">
-          <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-            Miniapp and notifications
-          </h2>
-          {added ? (
-            <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300 ${protoMono.className}`}>
-              Miniapp installed
-              {notificationDetails?.token && (
-                <p className={`text-xs text-gray-500 mt-1 ${protoMono.className}`}>Notifications enabled</p>
-              )}
-            </div>
-          ) : (
-            <Boton onClick={handleAddMiniApp} className="w-full py-2">
-              Install miniapp and enable notifications
-            </Boton>
-          )}
-          {addError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{addError}</p>}
-        </section>
 
         {/* Placeholder for the full app */}
         <section className="w-full max-w-sm mt-4 p-2 rounded-xl border-2 border-dashed border-gray-700 text-center">
