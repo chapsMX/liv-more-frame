@@ -7,9 +7,9 @@ import type { Context } from "@farcaster/miniapp-core";
 import { AddMiniApp } from "@farcaster/miniapp-core";
 import Image from "next/image";
 import { createPublicClient, createWalletClient, custom, http } from "viem";
-import { baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 import { protoMono } from "../styles/fonts";
-import { OG_ABI, OG_CONTRACT_ADDRESS } from "../lib/og-contract";
+import { OG_ABI, OG_CONTRACT_ADDRESS, OG_CHAIN_ID } from "../lib/og-contract";
 import { Boton } from "../styles/ui/boton";
 
 function HamburgerIcon({ className }: { className?: string }) {
@@ -153,7 +153,7 @@ export default function LivMore() {
   const checkOgMinted = useCallback(async (fid: number) => {
     try {
       const publicClient = createPublicClient({
-        chain: baseSepolia,
+        chain: base,
         transport: http(),
       });
       const minted = await publicClient.readContract({
@@ -179,7 +179,7 @@ export default function LivMore() {
     let cancelled = false;
     const fid = context.user.fid;
     const publicClient = createPublicClient({
-      chain: baseSepolia,
+      chain: base,
       transport: http(),
     });
     const resolveUrl = (url: string) => {
@@ -256,11 +256,11 @@ export default function LivMore() {
         return;
       }
       const walletClient = createWalletClient({
-        chain: baseSepolia,
+        chain: base,
         transport: custom(provider),
       });
       const publicClient = createPublicClient({
-        chain: baseSepolia,
+        chain: base,
         transport: custom(provider),
       });
       let minted = false;
@@ -291,18 +291,18 @@ export default function LivMore() {
         setIsMinting(false);
         return;
       }
-      const BASE_SEPOLIA_CHAIN_ID = "0x14A34";
+      const chainIdHex = `0x${OG_CHAIN_ID.toString(16)}`;
       try {
         const currentChainId = await provider.request({ method: "eth_chainId" });
-        if (currentChainId !== BASE_SEPOLIA_CHAIN_ID) {
+        if (currentChainId !== chainIdHex) {
           await provider.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: BASE_SEPOLIA_CHAIN_ID }],
+            params: [{ chainId: chainIdHex }],
           });
         }
       } catch (switchErr: unknown) {
         const msg = switchErr instanceof Error ? switchErr.message : "Could not switch network";
-        setMintError(`Switch to Base Sepolia first: ${msg}`);
+        setMintError(`Switch to Base first: ${msg}`);
         setIsMinting(false);
         return;
       }
@@ -325,12 +325,13 @@ export default function LivMore() {
         body: JSON.stringify({ fid, og: true }),
       });
       setShareError(null);
-      if (shareBaseUrl) {
+      if (shareBaseUrl && fid) {
         try {
-          const shareUrl = `${shareBaseUrl}/`;
+          const shareUrl = `${shareBaseUrl}/share-mint/${fid}`;
           const shareText =
-            `I just minted my LivMore OG token 👟\n` +
-            `Track your steps, attest, and earn. Join the movement!\n` +
+            `I just minted LivMore OG token 👟\n` +
+            `Tracking your healthy habits, one step at a time.\n` +
+            `Mint yours for free and join the movement!\n` +
             shareUrl;
           await sdk.actions.composeCast({
             text: shareText,
@@ -354,11 +355,17 @@ export default function LivMore() {
       setShareError("Share URL not configured");
       return;
     }
+    const fid = context?.user?.fid;
+    if (!fid) {
+      setShareError("Missing user fid");
+      return;
+    }
     try {
-      const shareUrl = `${shareBaseUrl}/`;
+      const shareUrl = `${shareBaseUrl}/share-mint/${fid}`;
       const shareText =
-        `I just minted my LivMore OG token 👟\n` +
-        `Track your steps, attest, and earn. Join the movement!\n` +
+      `I just minted LivMore OG token 👟\n` +
+      `Tracking your healthy habits, one step at a time.\n` +
+      `Mint yours for free and join the movement!\n` +
         shareUrl;
       await sdk.actions.composeCast({
         text: shareText,
@@ -368,7 +375,7 @@ export default function LivMore() {
       const msg = err instanceof Error ? err.message : "Failed to share";
       setShareError(msg);
     }
-  }, [shareBaseUrl]);
+  }, [shareBaseUrl, context?.user?.fid]);
 
   if (!sdkReady || isLoading) {
     return (
@@ -485,7 +492,6 @@ export default function LivMore() {
         <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
           <p className="text-sm text-gray-400">Wen token: Soon, via Clanker</p>
           <p className="text-sm text-gray-400">Supported Devices: Garmin, Polar</p>
-          <p className="text-sm text-gray-400">What: 👟👟👟</p>
         </section>
       </main>
 

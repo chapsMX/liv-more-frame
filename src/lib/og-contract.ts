@@ -1,13 +1,12 @@
 /**
- * OG NFT mint contract (StepsOG).
- * Base Sepolia — chain id 84532.
- * (If your RPC uses 74532, set NEXT_PUBLIC_OG_CHAIN_ID=74532.)
+ * OG NFT mint contract (LivMoreOG).
+ * Base mainnet — chain id 8453.
  */
 export const OG_CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_OG_CONTRACT_ADDRESS as `0x${string}`) ||
-  ("0xA3b171a6bB0EDb1C7Fce3A390abdDC32a9E29541" as `0x${string}`);
+  ("0x73590BCC99a8E334454C08858da91d1e869558B9" as `0x${string}`);
 
-export const OG_CHAIN_ID = Number(process.env.NEXT_PUBLIC_OG_CHAIN_ID ?? "84532");
+export const OG_CHAIN_ID = Number(process.env.NEXT_PUBLIC_OG_CHAIN_ID ?? "8453");
 
 export const OG_ABI = [
   {
@@ -39,7 +38,7 @@ export const OG_ABI = [
           { internalType: "uint256", name: "mintTimestamp", type: "uint256" },
           { internalType: "uint256", name: "seed", type: "uint256" },
         ],
-        internalType: "struct StepsOG.TokenData",
+        internalType: "struct LivMoreOG.TokenData",
         name: "",
         type: "tuple",
       },

@@ -8,6 +8,9 @@ import Providers from './Providers';
 export const metadata: Metadata = {
   title: 'LivMore',
   description: 'Turn healthy habits into rewards',
+  other: {
+    'base:app_id': '6980f8191672d70694e29334',
+  },
 };
 
 export default function RootLayout({
