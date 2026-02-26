@@ -57,7 +57,7 @@ export async function generateMetadata({
     version: "next",
     imageUrl: shareImageUrl,
     button: {
-      title: "Mint your LivMore OG",
+      title: "Mint LivMore OG",
       action: {
         type: "launch_frame",
         name: "LivMore",
@@ -71,12 +71,12 @@ export async function generateMetadata({
   return {
     ...(APP_URL && { metadataBase: new URL(APP_URL) }),
     title: `LivMore OG #${fid}`,
-    description: "Tracking your healthy habits, one step at a time.",
+    description: "One step at a time.",
     openGraph: {
       type: "website",
       url: shareUrl,
       title: `LivMore OG #${fid}`,
-      description: "Tracking your healthy habits, one step at a time.",
+      description: "One step at a time.",
       images: [{ url: shareImageUrl }],
     },
     other: {

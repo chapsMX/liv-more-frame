@@ -347,9 +347,9 @@ export default function LivMore() {
         try {
           const shareUrl = `${shareBaseUrl}/share-mint/${fid}`;
           const shareText =
-            `I just minted LivMore OG token 👟\n` +
+            `I just minted @livmore OG token 👟\n` +
             `Tracking your healthy habits, one step at a time.\n` +
-            `Mint yours for free and join the movement!\n` +
+            `Mint yours for free!\n` +
             shareUrl;
           await sdk.actions.composeCast({
             text: shareText,
@@ -381,9 +381,9 @@ export default function LivMore() {
     try {
       const shareUrl = `${shareBaseUrl}/share-mint/${fid}`;
       const shareText =
-      `I just minted LivMore OG token 👟\n` +
+      `I just minted @livmore OG token 👟\n` +
       `Tracking your healthy habits, one step at a time.\n` +
-      `Mint yours for free and join the movement!\n` +
+      `Mint yours for free!\n` +
         shareUrl;
       await sdk.actions.composeCast({
         text: shareText,
@@ -492,7 +492,7 @@ export default function LivMore() {
               OG Token
             </h2>
             <p className={`text-gray-500 text-xs ${protoMono.className}`}>
-              Mint your free OG NFT (Base Sepolia). One per FID. Then share to Farcaster.
+              Mint your free OG NFT on Base.
             </p>
             <Boton
               onClick={handleMintOg}
