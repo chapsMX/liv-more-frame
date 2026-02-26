@@ -7,9 +7,11 @@ import type { Context } from "@farcaster/miniapp-core";
 import { AddMiniApp } from "@farcaster/miniapp-core";
 import Image from "next/image";
 import { createPublicClient, createWalletClient, custom, http } from "viem";
+import { concat, encodeFunctionData } from "viem";
 import { base } from "viem/chains";
 import { protoMono } from "../styles/fonts";
 import { OG_ABI, OG_CONTRACT_ADDRESS, OG_CHAIN_ID } from "../lib/og-contract";
+import { DATA_SUFFIX } from "../lib/builder-code";
 import { Boton } from "../styles/ui/boton";
 
 function HamburgerIcon({ className }: { className?: string }) {
@@ -280,10 +282,16 @@ export default function LivMore() {
         setIsMinting(false);
         return;
       }
+      const account = (await walletClient.getAddresses())?.[0];
+      if (!account) {
+        setMintError("No wallet address");
+        setIsMinting(false);
+        return;
+      }
       const signRes = await fetch("/api/og-mint/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fid, username }),
+        body: JSON.stringify({ fid, username, recipient: account }),
       });
       const signData = await signRes.json();
       if (!signData.success || !signData.deadline || !signData.signature) {
@@ -306,12 +314,22 @@ export default function LivMore() {
         setIsMinting(false);
         return;
       }
-      const hash = await walletClient.writeContract({
-        address: OG_CONTRACT_ADDRESS,
-        abi: OG_ABI,
-        functionName: "mint",
-        args: [BigInt(fid), username, BigInt(signData.deadline), signData.signature as `0x${string}`],
-        account: (await walletClient.getAddresses())?.[0],
+      const hash = await walletClient.sendTransaction({
+        to: OG_CONTRACT_ADDRESS,
+        data: concat([
+          encodeFunctionData({
+            abi: OG_ABI,
+            functionName: "mint",
+            args: [
+              BigInt(fid),
+              username,
+              BigInt(signData.deadline),
+              signData.signature as `0x${string}`,
+            ],
+          }),
+          DATA_SUFFIX,
+        ]),
+        account,
       });
       if (!hash) {
         setMintError("Mint transaction failed");
