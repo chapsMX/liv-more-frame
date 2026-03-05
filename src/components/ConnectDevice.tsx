@@ -1,0 +1,69 @@
+"use client";
+
+import Image from "next/image";
+import { protoMono } from "@/styles/fonts";
+import { Boton } from "@/styles/ui/boton";
+import type { AppUser } from "@/types/user";
+
+type ConnectDeviceProps = {
+  user: AppUser;
+  onProviderSet?: () => void;
+};
+
+export default function ConnectDevice({ user }: ConnectDeviceProps) {
+  const handleConnectPolar = () => {
+    // TODO: Polar OAuth when implemented
+    console.log("[ConnectDevice] Connect Polar — OAuth not implemented yet");
+  };
+
+  return (
+    <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
+      <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
+        <div className="flex flex-1 items-center justify-center">
+          <Image
+            src="/livMore_w.png"
+            alt="Liv More"
+            width={80}
+            height={80}
+            priority
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <h1 className={`text-3xl font-bold ${protoMono.className}`}>LivMore</h1>
+        </div>
+      </div>
+      <p className={`text-gray-400 text-center text-base max-w-sm ${protoMono.className}`}>
+        Connect your device to track steps
+      </p>
+      <p className={`text-gray-600 text-center text-sm max-w-sm ${protoMono.className}`}>
+        Choose your wearable to get started.
+      </p>
+
+      <section className="w-full max-w-sm mt-4 space-y-3">
+        <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
+          Connect device
+        </h2>
+        <a
+          href={`/api/auth/garmin-v1?fid=${user.fid}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#ff8800] text-[#ff8800] hover:bg-[#ff8800] hover:text-white rounded-full min-w-[80px] transition-colors"
+        >
+          Connect Garmin
+        </a>
+        <Boton
+          onClick={handleConnectPolar}
+          className="w-full py-2"
+        >
+          Connect Polar
+        </Boton>
+        <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
+          Connect Garmin opens in a new tab (Garmin blocks iframes). After authorizing, close that tab and return here.
+        </p>
+        <p className={`text-gray-600 text-xs text-center mt-1 ${protoMono.className}`}>
+          Account FID: {user.fid}
+        </p>
+      </section>
+    </main>
+  );
+}

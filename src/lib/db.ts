@@ -22,6 +22,11 @@ export type User = {
   updated_at: Date;
   provider: "garmin" | "polar" | null;
   og: boolean;
+  /** OAuth access token for the connected provider (server-side only) */
+  provider_access_token?: string | null;
+  /** OAuth refresh token for the connected provider (server-side only) */
+  provider_refresh_token?: string | null;
+  provider_token_expires_at?: Date | string | null;
 };
 
 export type DailyStep = {

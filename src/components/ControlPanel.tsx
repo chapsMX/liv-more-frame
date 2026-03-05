@@ -26,6 +26,7 @@ export default function ControlPanel() {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOg, setIsOg] = useState(false);
 
   const fetchNeynarUser = useCallback(async (fid: number) => {
     try {
@@ -53,6 +54,13 @@ export default function ControlPanel() {
         }
         if (ctx.user?.fid) {
           await fetchNeynarUser(ctx.user.fid);
+          try {
+            const res = await fetch(`/api/user?fid=${ctx.user.fid}`);
+            const data = await res.json();
+            if (mounted && data.success && data.user?.og) setIsOg(true);
+          } catch {
+            // ignore; user may not exist yet
+          }
         }
 
         sdk.on("miniAppAdded", ({ notificationDetails: details }) => {
@@ -156,9 +164,9 @@ export default function ControlPanel() {
               </h2>
               {context?.user ? (
                 <div className="flex items-center gap-2 p-2 rounded-xl bg-gray-900 border border-gray-800">
-                  {(neynarUser?.pfp_url ?? context.user.pfpUrl) ? (
+                  {(neynarUser?.pfp_url ?? context?.user?.pfpUrl) ? (
                     <Image
-                      src={neynarUser?.pfp_url ?? context.user.pfpUrl ?? ""}
+                      src={neynarUser?.pfp_url ?? context?.user?.pfpUrl ?? ""}
                       alt="Avatar"
                       width={40}
                       height={40}
@@ -171,14 +179,15 @@ export default function ControlPanel() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className={`font-semibold truncate ${protoMono.className}`}>
-                      {neynarUser?.display_name ?? context.user.displayName ?? neynarUser?.username ?? context.user.username ?? `FID ${context.user.fid}`}
+                    <p className={`font-semibold flex items-center gap-1 min-w-0 ${protoMono.className}`}>
+                      <span className="truncate">{neynarUser?.display_name ?? context?.user?.displayName ?? neynarUser?.username ?? context?.user?.username ?? `FID ${context?.user?.fid ?? "—"}`}</span>
+                      {isOg && <span className="shrink-0" aria-label="OG">👑</span>}
                     </p>
                     <p className={`text-gray-500 text-xs truncate ${protoMono.className}`}>
-                      @{neynarUser?.username ?? context.user.username ?? "—"}
+                      @{neynarUser?.username ?? context?.user?.username ?? "—"}
                     </p>
                     <p className={`text-gray-500 text-xs mt-0.5 ${protoMono.className}`}>
-                      FID: {context.user.fid}
+                      FID: {context?.user?.fid ?? "—"}
                     </p>
                   </div>
                 </div>
