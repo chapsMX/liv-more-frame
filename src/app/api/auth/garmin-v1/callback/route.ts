@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
-import { getAccessToken } from "@/lib/garmin-oauth1";
+import { getAccessToken, getWellnessUserId } from "@/lib/garmin-oauth1";
 import {
   decodeOAuth1Cookie,
   GARMIN_OAUTH1_COOKIE_NAME,
@@ -56,18 +56,85 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appUrl}?error=token_exchange_failed`, 302);
   }
 
-  // OAuth 1.0 doesn't return expires_in; tokens are valid until user revokes. Set expires_at to 90 days for column compatibility.
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  // Fetch real Garmin user id from Wellness API (persists across tokens)
+  let garminUserId: string;
+  try {
+    garminUserId = await getWellnessUserId({
+      consumerKey,
+      consumerSecret,
+      accessToken: accessTokenRes.oauth_token,
+      accessTokenSecret: accessTokenRes.oauth_token_secret,
+    });
+  } catch (e) {
+    console.warn("[garmin-v1 callback] getWellnessUserId failed, using placeholder:", e);
+    // Fallback so connection still works; webhook can backfill later
+    const userRowsForPlaceholder = await sql`SELECT id FROM "2026_users" WHERE fid = ${fid} LIMIT 1`;
+    const uid = userRowsForPlaceholder[0]?.id as number | undefined;
+    garminUserId = uid != null ? `livmore-user-${uid}` : `livmore-${fid}`;
+  }
 
   try {
+    // Resolve user id from fid
+    const userRows = await sql`
+      SELECT id FROM "2026_users" WHERE fid = ${fid} LIMIT 1
+    `;
+    if (userRows.length === 0) {
+      console.error("[garmin-v1 callback] User not found for fid:", fid);
+      return NextResponse.redirect(`${appUrl}?error=user_not_found`, 302);
+    }
+    const userId = userRows[0].id as number;
+
+    // Upsert provider connection (one row per user; (re)connect Garmin)
+    const connRows = await sql`
+      INSERT INTO "2026_provider_connections" (user_id, provider)
+      VALUES (${userId}, 'garmin')
+      ON CONFLICT (user_id) DO UPDATE SET
+        provider = 'garmin',
+        disconnected_at = null
+      RETURNING id
+    `;
+    const connectionId = connRows[0]?.id as number;
+    if (connectionId == null) {
+      console.error("[garmin-v1 callback] Failed to get connection_id");
+      return NextResponse.redirect(`${appUrl}?error=db_update_failed`, 302);
+    }
+
+    // If we have real Garmin user id, update existing row by connection_id first (replace placeholder), else insert
+    const isRealGarminId = !garminUserId.startsWith("livmore-user-") && !garminUserId.startsWith("livmore-");
+    if (isRealGarminId) {
+      const updated = await sql`
+        UPDATE "2026_garmin_connections"
+        SET garmin_user_id = ${garminUserId},
+            access_token = ${accessTokenRes.oauth_token},
+            token_secret = ${accessTokenRes.oauth_token_secret}
+        WHERE connection_id = ${connectionId}
+        RETURNING id
+      `;
+      if (updated.length === 0) {
+        await sql`
+          INSERT INTO "2026_garmin_connections" (connection_id, garmin_user_id, access_token, token_secret)
+          VALUES (${connectionId}, ${garminUserId}, ${accessTokenRes.oauth_token}, ${accessTokenRes.oauth_token_secret})
+          ON CONFLICT (garmin_user_id) DO UPDATE SET
+            connection_id = EXCLUDED.connection_id,
+            access_token = EXCLUDED.access_token,
+            token_secret = EXCLUDED.token_secret
+        `;
+      }
+    } else {
+      await sql`
+        INSERT INTO "2026_garmin_connections" (connection_id, garmin_user_id, access_token, token_secret)
+        VALUES (${connectionId}, ${garminUserId}, ${accessTokenRes.oauth_token}, ${accessTokenRes.oauth_token_secret})
+        ON CONFLICT (garmin_user_id) DO UPDATE SET
+          connection_id = EXCLUDED.connection_id,
+          access_token = EXCLUDED.access_token,
+          token_secret = EXCLUDED.token_secret
+      `;
+    }
+
+    // Keep 2026_users.provider in sync so the app knows which provider is connected
     await sql`
       UPDATE "2026_users"
-      SET
-        provider = 'garmin',
-        provider_access_token = ${accessTokenRes.oauth_token},
-        provider_refresh_token = ${accessTokenRes.oauth_token_secret},
-        provider_token_expires_at = ${expiresAt},
-        updated_at = now()
+      SET provider = 'garmin', updated_at = now()
       WHERE fid = ${fid}
     `;
   } catch (e) {

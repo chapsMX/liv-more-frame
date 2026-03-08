@@ -171,3 +171,85 @@ export async function getAccessToken(params: OAuth1AccessTokenParams): Promise<{
 
 /** Garmin OAuth 1.0 user authorization URL (step 2) */
 export const GARMIN_OAUTH1_AUTHORIZE_URL = "https://connect.garmin.com/partner/oauthConfirm";
+
+export type OAuth1SignedGetParams = {
+  consumerKey: string;
+  consumerSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+  url: string;
+};
+
+/**
+ * Perform a signed GET request with user OAuth 1.0 credentials (e.g. Wellness API).
+ */
+export async function oauth1SignedGet<T = unknown>(params: OAuth1SignedGetParams): Promise<T> {
+  const { consumerKey, consumerSecret, accessToken, accessTokenSecret, url } = params;
+  const method = "GET";
+
+  const nonce = createHmac("sha1", String(Date.now())).update(Math.random().toString()).digest("hex").slice(0, 32);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  const oauthParams: Array<{ key: string; value: string }> = [
+    { key: "oauth_consumer_key", value: consumerKey },
+    { key: "oauth_nonce", value: nonce },
+    { key: "oauth_signature_method", value: "HMAC-SHA1" },
+    { key: "oauth_timestamp", value: timestamp },
+    { key: "oauth_token", value: accessToken },
+    { key: "oauth_version", value: "1.0" },
+  ];
+
+  const baseString = buildSignatureBaseString(method, url, oauthParams);
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = signHmacSha1(signingKey, baseString);
+
+  const authHeader =
+    'OAuth oauth_consumer_key="' +
+    percentEncode(consumerKey) +
+    '", oauth_nonce="' +
+    percentEncode(nonce) +
+    '", oauth_signature="' +
+    percentEncode(signature) +
+    '", oauth_signature_method="HMAC-SHA1", oauth_timestamp="' +
+    timestamp +
+    '", oauth_token="' +
+    percentEncode(accessToken) +
+    '", oauth_version="1.0"';
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: authHeader,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Garmin signed GET failed: ${res.status} ${text}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+const GARMIN_WELLNESS_API_BASE = "https://apis.garmin.com/wellness-api";
+
+/**
+ * Get the Garmin Health API user id (persists across tokens).
+ * GET https://apis.garmin.com/wellness-api/rest/user/id
+ */
+export async function getWellnessUserId(params: {
+  consumerKey: string;
+  consumerSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}): Promise<string> {
+  const url = `${GARMIN_WELLNESS_API_BASE}/rest/user/id`;
+  const data = await oauth1SignedGet<{ userId: string }>({
+    ...params,
+    url,
+  });
+  if (!data?.userId || typeof data.userId !== "string") {
+    throw new Error("Garmin Wellness API: missing userId in response");
+  }
+  return data.userId;
+}

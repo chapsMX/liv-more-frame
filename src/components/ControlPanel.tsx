@@ -17,6 +17,9 @@ type NeynarUser = {
   custody_address?: string;
 };
 
+/** Provider from 2026_users (device connection) */
+type DeviceProvider = "garmin" | "polar" | null;
+
 export default function ControlPanel() {
   const [context, setContext] = useState<Context.MiniAppContext | null>(null);
   const [neynarUser, setNeynarUser] = useState<NeynarUser | null>(null);
@@ -27,6 +30,9 @@ export default function ControlPanel() {
   const [addError, setAddError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOg, setIsOg] = useState(false);
+  const [deviceProvider, setDeviceProvider] = useState<DeviceProvider>(null);
+  const [disconnectLoading, setDisconnectLoading] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
   const fetchNeynarUser = useCallback(async (fid: number) => {
     try {
@@ -57,7 +63,10 @@ export default function ControlPanel() {
           try {
             const res = await fetch(`/api/user?fid=${ctx.user.fid}`);
             const data = await res.json();
-            if (mounted && data.success && data.user?.og) setIsOg(true);
+            if (mounted && data.success && data.user) {
+              if (data.user.og) setIsOg(true);
+              setDeviceProvider(data.user.provider ?? null);
+            }
           } catch {
             // ignore; user may not exist yet
           }
@@ -134,6 +143,29 @@ export default function ControlPanel() {
       } else {
         setAddError(e instanceof Error ? e.message : "Error adding miniapp");
       }
+    }
+  };
+
+  const handleDisconnectDevice = async () => {
+    if (!context?.user?.fid) return;
+    setDisconnectError(null);
+    setDisconnectLoading(true);
+    try {
+      const res = await fetch("/api/user/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fid: context.user.fid }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeviceProvider(null);
+      } else {
+        setDisconnectError(data.error ?? "Error al desconectar");
+      }
+    } catch (e) {
+      setDisconnectError(e instanceof Error ? e.message : "Error al desconectar");
+    } finally {
+      setDisconnectLoading(false);
     }
   };
 
@@ -231,6 +263,54 @@ export default function ControlPanel() {
                 </Boton>
               )}
               {addError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{addError}</p>}
+            </section>
+
+            {/* Device connection (from 2026_users.provider) */}
+            <section className="w-full max-w-sm space-y-2 mt-6">
+              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
+                Device
+              </h2>
+              {deviceProvider ? (
+                <div className="space-y-2">
+                  <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300 ${protoMono.className}`}>
+                    Connected: <span className="capitalize">{deviceProvider}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Boton
+                      onClick={handleDisconnectDevice}
+                      disabled={disconnectLoading}
+                      className="w-full py-2 bg-red-900/50 border-red-700 hover:bg-red-900/70"
+                    >
+                      {disconnectLoading ? "Desconectando…" : `Desconectar ${deviceProvider === "garmin" ? "Garmin" : "Polar"}`}
+                    </Boton>
+                    {deviceProvider === "garmin" && (
+                      <a
+                        href="https://connect.garmin.com/managerConnections"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-center text-sm text-gray-400 hover:text-white underline ${protoMono.className}`}
+                      >
+                        Gestionar conexión en Garmin
+                      </a>
+                    )}
+                  </div>
+                  {disconnectError && (
+                    <p className={`text-red-400 text-xs ${protoMono.className}`}>{disconnectError}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className={`text-sm text-gray-500 ${protoMono.className}`}>No device connected</p>
+                  <Link
+                    href="/"
+                    className="block w-full"
+                  >
+                    <Boton className="w-full py-2">
+                      Connect device (Garmin or Polar)
+                    </Boton>
+                  </Link>
+                </div>
+              )}
             </section>
           </>
         )}
