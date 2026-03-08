@@ -30,6 +30,29 @@ function getLast7DaysRange(): { from: string; to: string } {
   return { from, to };
 }
 
+/** ISO week number and year for a date */
+function getISOWeekAndYear(d: Date): { week: number; year: number } {
+  const date = new Date(d.getTime());
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  const thursday = new Date(date);
+  thursday.setDate(diff + 3);
+  const year = thursday.getFullYear();
+  const startOfYear = new Date(year, 0, 1);
+  const week = Math.ceil((((thursday.getTime() - startOfYear.getTime()) / 86400000) + 1) / 7);
+  return { week, year };
+}
+
+/** Format YYYY-MM-DD as "Mon, D, YYYY" (e.g. Mar, 7, 2026) */
+function formatDateMonthDayYear(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  const month = d.toLocaleString("en-US", { month: "short" });
+  const day = d.getUTCDate();
+  const year = d.getUTCFullYear();
+  return `${month}, ${day}, ${year}`;
+}
+
 /** User has a device connected (from 2026_users.provider) */
 function hasDevice(provider: AppUser["provider"] | undefined): boolean {
   return provider === "garmin" || provider === "polar";
@@ -69,7 +92,7 @@ export default function LivMore() {
   const hasEnsuredUserRef = useRef(false);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [userLoadDone, setUserLoadDone] = useState(false);
-  const [weeklySteps, setWeeklySteps] = useState<{ date: string; steps: number }[]>([]);
+  const [weeklySteps, setWeeklySteps] = useState<{ date: string; steps: number; attestation_hash: string | null }[]>([]);
   const [weeklyStepsLoading, setWeeklyStepsLoading] = useState(false);
 
   const refetchUser = useCallback(async () => {
@@ -235,9 +258,10 @@ export default function LivMore() {
       .then((data) => {
         if (data.success && Array.isArray(data.steps)) {
           setWeeklySteps(
-            data.steps.map((s: { date: string; steps: number }) => ({
+            data.steps.map((s: { date: string; steps: number; attestation_hash?: string | null }) => ({
               date: s.date,
               steps: Number(s.steps) || 0,
+              attestation_hash: s.attestation_hash ?? null,
             }))
           );
         } else {
@@ -261,6 +285,7 @@ export default function LivMore() {
     return dates;
   })();
   const stepsByDate = new Map(weeklySteps.map((s) => [s.date, s.steps]));
+  const attestationByDate = new Map(weeklySteps.map((s) => [s.date, s.attestation_hash]));
 
   if (!sdkReady || isLoading) {
     return (
@@ -283,12 +308,23 @@ export default function LivMore() {
 
   return (
     <div className={`min-h-screen bg-black text-white flex flex-col ${protoMono.className}`}>
-      {/* Top bar: menu pill (profile + hamburger) top right */}
-      <header className="flex justify-end items-center p-2 pr-3 shrink-0 border-b border-gray-800">
+      {/* Top bar: Liv More | Menú hamburguesa (panel de control) */}
+      <header className="flex justify-between items-center px-3 py-2 shrink-0 border-b border-gray-800">
+        <div className="flex items-center gap-2 min-w-0">
+          <Image
+            src="/livMore_w.png"
+            alt=""
+            width={32}
+            height={32}
+            className="shrink-0"
+            priority
+          />
+          <span className={`text-lg font-bold truncate ${protoMono.className}`}>Liv More</span>
+        </div>
         <button
           type="button"
           onClick={() => router.push("/control-panel")}
-          className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full bg-gray-900 border border-gray-700 hover:bg-gray-800 hover:border-gray-600 transition-colors"
+          className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full bg-gray-900 border border-gray-700 hover:bg-gray-800 hover:border-gray-600 transition-colors shrink-0"
           aria-label="Open menu"
         >
           {(neynarUser?.pfp_url ?? context?.user?.pfpUrl) ? (
@@ -311,28 +347,21 @@ export default function LivMore() {
 
       {hasDevice(appUser?.provider) ? (
         <>
-          {/* Logo + LivMore primero */}
           <main className="flex-1 flex flex-col items-center p-2 gap-2 overflow-auto">
-            <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
-              <div className="flex flex-1 items-center justify-center">
-                <Image
-                  src="/livMore_w.png"
-                  alt="Liv More"
-                  width={80}
-                  height={80}
-                  priority
-                />
-              </div>
-              <div className="flex flex-1 items-center justify-center">
-                <h1 className={`text-3xl font-bold ${protoMono.className}`}>LivMore</h1>
-              </div>
-            </div>
+            {/* Week title: Week N | YEAR (blanco, un poco más grande) */}
+            {(() => {
+              const { week, year } = getISOWeekAndYear(new Date());
+              return (
+                <section className="w-full max-w-sm pt-4 pb-1 shrink-0">
+                  <h2 className={`text-base font-semibold text-white ${protoMono.className}`}>
+                    Week {week} | {year}
+                  </h2>
+                </section>
+              );
+            })()}
 
-            {/* Weekly stats — orden descendente (más reciente primero) */}
-            <section className="w-full max-w-sm px-3 pt-4 pb-2 shrink-0">
-              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 ${protoMono.className}`}>
-                Weekly stats
-              </h2>
+            {/* Tabla: Date | Steps | Attestation (orden descendente) */}
+            <section className="w-full max-w-sm pt-2 pb-2 shrink-0">
               {weeklyStepsLoading ? (
                 <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
               ) : (
@@ -342,16 +371,34 @@ export default function LivMore() {
                       <tr className="bg-gray-900 border-b border-gray-700">
                         <th className="text-left py-2 px-3 text-gray-400 font-semibold">Date</th>
                         <th className="text-right py-2 px-3 text-gray-400 font-semibold">Steps</th>
+                        <th className="text-center py-2 px-3 text-gray-400 font-semibold">Attestation</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[...weeklyDates].reverse().map((date) => {
                         const steps = stepsByDate.get(date);
+                        const attestationHash = attestationByDate.get(date);
+                        const hasAttested = !!attestationHash;
                         return (
                           <tr key={date} className="border-b border-gray-800 last:border-0">
-                            <td className="py-2 px-3 text-gray-300">{date}</td>
+                            <td className="py-2 px-3 text-gray-300">
+                              {formatDateMonthDayYear(date)}
+                            </td>
                             <td className="py-2 px-3 text-right text-white font-medium">
                               {steps !== undefined ? steps.toLocaleString() : "—"}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {hasAttested ? (
+                                <span className="text-green-500" aria-label="Attested">✓</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={`text-gray-400 hover:text-white text-xs underline ${protoMono.className}`}
+                                  disabled
+                                >
+                                  Attest
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -441,11 +488,21 @@ export default function LivMore() {
       </main>
       )}
 
-      <footer className="w-full py-4 text-center">
+      <footer className="w-full py-4 text-center shrink-0 border-t border-gray-800">
         <p className={`text-gray-500 text-sm ${protoMono.className}`}>
           built with <span className="text-red-500">❤</span> during ETH Denver
         </p>
       </footer>
+
+      {/* Bottom menu: home | leaderboard | steps | og (sin función por ahora) */}
+      <nav className={`w-full shrink-0 border-t border-gray-800 bg-black ${protoMono.className}`} aria-label="Bottom menu">
+        <div className="grid grid-cols-4 text-center">
+          <div className="py-3 text-gray-400" title="Home">🏠</div>
+          <div className="py-3 text-gray-400" title="Leaderboard">📊</div>
+          <div className="py-3 text-gray-400" title="Steps">👟</div>
+          <div className="py-3 text-gray-400" title="OG">✨</div>
+        </div>
+      </nav>
     </div>
   );
 }

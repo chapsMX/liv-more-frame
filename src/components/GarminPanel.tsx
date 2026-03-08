@@ -25,7 +25,7 @@ export default function GarminPanel({ user }: { user: AppUser }) {
         Garmin connected
       </p>
       <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
-        <p className="text-sm text-gray-500">Steps and activity will appear here.</p>
+        <p className="text-sm text-gray-500">Los Steps and activity will appear here.</p>
         <p className="text-xs text-gray-600 mt-2">User FID: {user.fid}</p>
       </section>
     </main>

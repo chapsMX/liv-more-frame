@@ -137,6 +137,20 @@ export async function GET(request: Request) {
       SET provider = 'garmin', updated_at = now()
       WHERE fid = ${fid}
     `;
+
+    // Trigger backfill of historical steps after successful connection
+    const baseUrl = process.env.NEXT_PUBLIC_URL;
+    if (baseUrl) {
+      try {
+        await fetch(`${baseUrl}/api/garmin/backfill`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, daysBack: 5 }),
+        });
+      } catch (e) {
+        console.error("[garmin-v1 callback] backfill request failed:", e);
+      }
+    }
   } catch (e) {
     console.error("[garmin-v1 callback] DB update failed:", e);
     return NextResponse.redirect(`${appUrl}?error=db_update_failed`, 302);
