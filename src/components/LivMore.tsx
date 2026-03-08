@@ -9,8 +9,6 @@ import Image from "next/image";
 import { protoMono } from "../styles/fonts";
 import { Boton } from "../styles/ui/boton";
 import type { AppUser } from "@/types/user";
-import GarminPanel from "./GarminPanel";
-import PolarPanel from "./PolarPanel";
 import ConnectDevice from "./ConnectDevice";
 
 /** Only these FIDs can see Garmin/Polar connection buttons during the update period */
@@ -313,44 +311,63 @@ export default function LivMore() {
 
       {hasDevice(appUser?.provider) ? (
         <>
-          {/* Weekly stats — últimos 7 días (o los que haya) */}
-          <section className="w-full max-w-sm mx-auto px-3 pt-4 pb-2 shrink-0 border-b border-gray-800">
-            <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 ${protoMono.className}`}>
-              Weekly stats
-            </h2>
-            {weeklyStepsLoading ? (
-              <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
-            ) : (
-              <div className={`overflow-hidden rounded-lg border border-gray-700 ${protoMono.className}`}>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-900 border-b border-gray-700">
-                      <th className="text-left py-2 px-3 text-gray-400 font-semibold">Date</th>
-                      <th className="text-right py-2 px-3 text-gray-400 font-semibold">Steps</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weeklyDates.map((date) => {
-                      const steps = stepsByDate.get(date);
-                      return (
-                        <tr key={date} className="border-b border-gray-800 last:border-0">
-                          <td className="py-2 px-3 text-gray-300">{date}</td>
-                          <td className="py-2 px-3 text-right text-white font-medium">
-                            {steps !== undefined ? steps.toLocaleString() : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {/* Logo + LivMore primero */}
+          <main className="flex-1 flex flex-col items-center p-2 gap-2 overflow-auto">
+            <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
+              <div className="flex flex-1 items-center justify-center">
+                <Image
+                  src="/livMore_w.png"
+                  alt="Liv More"
+                  width={80}
+                  height={80}
+                  priority
+                />
               </div>
-            )}
-          </section>
-          {appUser!.provider === "garmin" ? (
-            <GarminPanel user={appUser!} />
-          ) : (
-            <PolarPanel user={appUser!} />
-          )}
+              <div className="flex flex-1 items-center justify-center">
+                <h1 className={`text-3xl font-bold ${protoMono.className}`}>LivMore</h1>
+              </div>
+            </div>
+
+            {/* Weekly stats — orden descendente (más reciente primero) */}
+            <section className="w-full max-w-sm px-3 pt-4 pb-2 shrink-0">
+              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 ${protoMono.className}`}>
+                Weekly stats
+              </h2>
+              {weeklyStepsLoading ? (
+                <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
+              ) : (
+                <div className={`overflow-hidden rounded-lg border border-gray-700 ${protoMono.className}`}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-900 border-b border-gray-700">
+                        <th className="text-left py-2 px-3 text-gray-400 font-semibold">Date</th>
+                        <th className="text-right py-2 px-3 text-gray-400 font-semibold">Steps</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...weeklyDates].reverse().map((date) => {
+                        const steps = stepsByDate.get(date);
+                        return (
+                          <tr key={date} className="border-b border-gray-800 last:border-0">
+                            <td className="py-2 px-3 text-gray-300">{date}</td>
+                            <td className="py-2 px-3 text-right text-white font-medium">
+                              {steps !== undefined ? steps.toLocaleString() : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Recuadro de FAQs */}
+            <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
+              <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
+              <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
+            </section>
+          </main>
         </>
       ) : appUser && hasNoDevice(appUser.provider) ? (
         ALLOWED_BETA_FIDS.includes(appUser.fid) ? (
@@ -372,8 +389,8 @@ export default function LivMore() {
               Stay tuned for device connection and more.
             </p>
             <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
-              <p className="text-sm text-gray-400">Wen token: Soon, via Clanker</p>
-              <p className="text-sm text-gray-400">Supported Devices: Garmin, Polar</p>
+              <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
+              <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
             </section>
           </main>
         )
@@ -418,8 +435,8 @@ export default function LivMore() {
 
         {/* FAQs */}
         <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
-          <p className="text-sm text-gray-400">Wen token: Soon, via Clanker</p>
-          <p className="text-sm text-gray-400">Supported Devices: Garmin, Polar</p>
+          <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
+          <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
         </section>
       </main>
       )}
