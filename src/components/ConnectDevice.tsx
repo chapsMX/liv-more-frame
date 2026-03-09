@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { protoMono } from "@/styles/fonts";
-import { Boton } from "@/styles/ui/boton";
 import type { AppUser } from "@/types/user";
 
 type ConnectDeviceProps = {
@@ -11,11 +10,6 @@ type ConnectDeviceProps = {
 };
 
 export default function ConnectDevice({ user }: ConnectDeviceProps) {
-  const handleConnectPolar = () => {
-    // TODO: Polar OAuth when implemented
-    console.log("[ConnectDevice] Connect Polar — OAuth not implemented yet");
-  };
-
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
       <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
@@ -51,14 +45,16 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         >
           Connect Garmin
         </a>
-        <Boton
-          onClick={handleConnectPolar}
-          className="w-full py-2"
+        <a
+          href={`/api/auth/polar?fid=${user.fid}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#d4003c] text-[#d4003c] hover:bg-[#d4003c] hover:text-white rounded-full min-w-[80px] transition-colors"
         >
           Connect Polar
-        </Boton>
+        </a>
         <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
-          Connect Garmin opens in a new tab (Garmin blocks iframes). After authorizing, close that tab and return here.
+          Both connections open in a new tab. After authorizing, close that tab and return here.
         </p>
         <p className={`text-gray-600 text-xs text-center mt-1 ${protoMono.className}`}>
           Account FID: {user.fid}
