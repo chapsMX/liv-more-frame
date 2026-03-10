@@ -309,7 +309,7 @@ export default function LivMore() {
   return (
     <div className={`min-h-screen bg-black text-white flex flex-col ${protoMono.className}`}>
       {/* Top bar: Liv More | Menú hamburguesa (panel de control) */}
-      <header className="flex justify-between items-center px-3 py-2 shrink-0 border-b border-gray-800">
+      <header className="flex justify-between items-center px-3 py-2 pb-0 shrink-0 border-b border-gray-800">
         <div className="flex items-center gap-2 min-w-0">
           <Image
             src="/livMore_w.png"
@@ -319,7 +319,7 @@ export default function LivMore() {
             className="shrink-0"
             priority
           />
-          <span className={`text-lg font-bold truncate ${protoMono.className}`}>Liv More</span>
+          <span className={`text-lg font-bold truncate ${protoMono.className}`}>LivMore</span>
         </div>
         <button
           type="button"
@@ -352,26 +352,26 @@ export default function LivMore() {
             {(() => {
               const { week, year } = getISOWeekAndYear(new Date());
               return (
-                <section className="w-full max-w-sm pt-4 pb-1 shrink-0">
-                  <h2 className={`text-base font-semibold text-white ${protoMono.className}`}>
-                    Week {week} | {year}
+                <section className="w-full max-w-sm pt-3 pb-0 shrink-0">
+                  <h2 className={`text-base text-center font-semibold text-white ${protoMono.className}`}>
+                   🟢 | Week {week} | {year} | 🟢 
                   </h2>
                 </section>
               );
             })()}
 
             {/* Tabla: Date | Steps | Attestation (orden descendente) */}
-            <section className="w-full max-w-sm pt-2 pb-2 shrink-0">
+            <section className="w-full max-w-sm pt-2 pb-0 shrink-0">
               {weeklyStepsLoading ? (
                 <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
               ) : (
                 <div className={`overflow-hidden rounded-lg border border-gray-700 ${protoMono.className}`}>
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm pb-0 mb-0">
                     <thead>
-                      <tr className="bg-gray-900 border-b border-gray-700">
-                        <th className="text-left py-2 px-3 text-gray-400 font-semibold">Date</th>
-                        <th className="text-right py-2 px-3 text-gray-400 font-semibold">Steps</th>
-                        <th className="text-center py-2 px-3 text-gray-400 font-semibold">Attestation</th>
+                      <tr className="text-white border-b border-gray-700 pb-0 mb-0">
+                        <th className="text-left py-2 px-3 text-white font-semibold">Date</th>
+                        <th className="text-right py-2 px-3 text-white font-semibold">Steps</th>
+                        <th className="text-center py-2 px-3 text-white font-semibold">Attestation</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -408,12 +408,12 @@ export default function LivMore() {
                 </div>
               )}
             </section>
-
-            {/* Recuadro de FAQs */}
-            <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
-              <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
-              <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
-            </section>
+            { /* aviso atestaciones */}
+            <section className="w-full max-w-sm pt-3 pb-0 shrink-0">
+                  <h2 className={`text-sm text-center font-semibold text-white ${protoMono.className}`}>
+                    Only attested steps count as valid steps for the weekly leaderboard.
+                  </h2>
+                </section>
           </main>
         </>
       ) : appUser && hasNoDevice(appUser.provider) ? (
