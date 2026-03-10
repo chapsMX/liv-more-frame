@@ -7,7 +7,6 @@ import { sdk } from "@farcaster/miniapp-sdk";
 import type { Context } from "@farcaster/miniapp-core";
 import { AddMiniApp } from "@farcaster/miniapp-core";
 import { protoMono } from "../styles/fonts";
-import { Boton } from "../styles/ui/boton";
 
 type NeynarUser = {
   fid: number;
@@ -191,125 +190,132 @@ export default function ControlPanel() {
           <>
             {/* User info (from Neynar or SDK context) */}
             <section className="w-full max-w-sm space-y-2">
-              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-                User
-              </h2>
               {context?.user ? (
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-gray-900 border border-gray-800">
-                  {(neynarUser?.pfp_url ?? context?.user?.pfpUrl) ? (
-                    <Image
-                      src={neynarUser?.pfp_url ?? context?.user?.pfpUrl ?? ""}
-                      alt="Avatar"
-                      width={40}
-                      height={40}
-                      className="rounded-full border border-gray-700"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className={`w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm ${protoMono.className}`}>
-                      ?
+                <div className="p-2 rounded-xl bg-gray-900 border border-gray-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    {(neynarUser?.pfp_url ?? context?.user?.pfpUrl) ? (
+                      <Image
+                        src={neynarUser?.pfp_url ?? context?.user?.pfpUrl ?? ""}
+                        alt="Avatar"
+                        width={80}
+                        height={80}
+                        className="rounded-full border border-gray-700 shrink-0"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className={`w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm shrink-0 ${protoMono.className}`}>
+                        ?
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className={`text-lg font-semibold truncate min-w-0 ${protoMono.className}`}>
+                        {neynarUser?.display_name ?? context?.user?.displayName ?? neynarUser?.username ?? context?.user?.username ?? `FID ${context?.user?.fid ?? "—"}`}
+                      </p>
+                      <p className={`text-gray-500 text-sm truncate ${protoMono.className}`}>
+                        @{neynarUser?.username ?? context?.user?.username ?? "—"}
+                      </p>
+                      <p className={`text-gray-500 text-sm mt-0.5 ${protoMono.className}`}>
+                        FID: {context?.user?.fid ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status — above Wallet */}
+                  {isOg && (
+                    <p className={`text-sm text-gray-500 flex items-center gap-1 flex-wrap ${protoMono.className}`}>
+                      <span className="text-white">Status:</span>
+                      <span className="text-amber-400 font-medium">OG Minter</span>
+                    </p>
+                  )}
+
+                  {/* Wallet — one row */}
+                  <p className={`text-sm text-white flex items-center gap-1 flex-wrap ${protoMono.className}`}>
+                    <span className="text-white">Wallet:</span>
+                    {walletAddress ? (
+                      <span className="text-gray-300">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectWallet}
+                        className="text-amber-400 hover:text-amber-300 underline"
+                      >
+                        Connect wallet
+                      </button>
+                    )}
+                  </p>
+                  {walletError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{walletError}</p>}
+
+                  {/* Miniapp — one row */}
+                  <p className={`text-sm text-white flex items-center gap-1 flex-wrap ${protoMono.className}`}>
+                    <span className="text-white">Miniapp:</span>
+                    {added && notificationDetails?.token ? (
+                      <span className="text-gray-300">Installed and notifis enabled</span>
+                    ) : added ? (
+                      <span className="text-gray-300">Installed</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleAddMiniApp}
+                        className="text-amber-400 hover:text-amber-300 underline"
+                      >
+                        Install & enable notis 🔈
+                      </button>
+                    )}
+                  </p>
+                  {addError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{addError}</p>}
+
+                  {/* Wearable — one row */}
+                  <p className={`text-sm text-white flex items-center gap-1 flex-wrap ${protoMono.className}`}>
+                    <span className="text-white">Wearable:</span>
+                    {deviceProvider ? (
+                      <>
+                        <span className="text-gray-300 capitalize">{deviceProvider}</span>
+                        <span className="text-gray-600">·</span>
+                        <button
+                          type="button"
+                          onClick={handleDisconnectDevice}
+                          disabled={disconnectLoading}
+                          className="text-amber-400 hover:text-amber-300 underline disabled:opacity-50 disabled:no-underline"
+                        >
+                          {disconnectLoading ? "Disconnecting…" : "Disconnect"}
+                        </button>
+                        {deviceProvider === "garmin" && (
+                          <>
+                            <span className="text-gray-600">·</span>
+                            <a
+                              href="https://connect.garmin.com/managerConnections"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-400 hover:text-amber-300 underline"
+                            >
+                              Manage on Garmin
+                            </a>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <Link href="/" className="text-amber-400 hover:text-amber-300 underline">
+                        Connect device (Garmin or Polar)
+                      </Link>
+                    )}
+                  </p>
+                  {disconnectError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{disconnectError}</p>}
+
+                  {/* NFT — below everything, full width of container */}
+                  {isOg && context?.user?.fid && (
+                    <div className="relative w-[calc(100%+1rem)] -mx-2 aspect-square overflow-hidden rounded-b-lg">
+                      <Image
+                        src={`/imagen/${context.user.fid}`}
+                        alt="LivMore OG"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <p className={`font-semibold flex items-center gap-1 min-w-0 ${protoMono.className}`}>
-                      <span className="truncate">{neynarUser?.display_name ?? context?.user?.displayName ?? neynarUser?.username ?? context?.user?.username ?? `FID ${context?.user?.fid ?? "—"}`}</span>
-                      {isOg && <span className="shrink-0" aria-label="OG">👑</span>}
-                    </p>
-                    <p className={`text-gray-500 text-xs truncate ${protoMono.className}`}>
-                      @{neynarUser?.username ?? context?.user?.username ?? "—"}
-                    </p>
-                    <p className={`text-gray-500 text-xs mt-0.5 ${protoMono.className}`}>
-                      FID: {context?.user?.fid ?? "—"}
-                    </p>
-                  </div>
                 </div>
               ) : (
                 <p className={`text-gray-500 text-sm ${protoMono.className}`}>No user found. Open from the miniapp.</p>
-              )}
-            </section>
-
-            {/* Wallet */}
-            <section className="w-full max-w-sm space-y-2 mt-6">
-              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-                Wallet
-              </h2>
-              {walletAddress ? (
-                <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 break-all text-sm text-gray-300 ${protoMono.className}`}>
-                  {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
-                </div>
-              ) : (
-                <Boton onClick={handleConnectWallet} className="w-full py-2">
-                  Connect wallet
-                </Boton>
-              )}
-              {walletError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{walletError}</p>}
-            </section>
-
-            {/* Miniapp and notifications */}
-            <section className="w-full max-w-sm space-y-2 mt-6">
-              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-                Miniapp and notifications
-              </h2>
-              {added ? (
-                <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300 ${protoMono.className}`}>
-                  Miniapp installed
-                  {notificationDetails?.token && (
-                    <p className={`text-xs text-gray-500 mt-1 ${protoMono.className}`}>Notifications enabled</p>
-                  )}
-                </div>
-              ) : (
-                <Boton onClick={handleAddMiniApp} className="w-full py-2">
-                  Install miniapp and enable notifications
-                </Boton>
-              )}
-              {addError && <p className={`text-red-400 text-xs ${protoMono.className}`}>{addError}</p>}
-            </section>
-
-            {/* Device connection (from 2026_users.provider) */}
-            <section className="w-full max-w-sm space-y-2 mt-6">
-              <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
-                Device
-              </h2>
-              {deviceProvider ? (
-                <div className="space-y-2">
-                  <div className={`p-2 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-300 ${protoMono.className}`}>
-                    Connected: <span className="capitalize">{deviceProvider}</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Boton
-                      onClick={handleDisconnectDevice}
-                      disabled={disconnectLoading}
-                      className="w-full py-2 bg-red-900/50 border-red-700 hover:bg-red-900/70"
-                    >
-                      {disconnectLoading ? "Disconnecting…" : `Disconnect ${deviceProvider === "garmin" ? "Garmin" : "Polar"}`}
-                    </Boton>
-                    {deviceProvider === "garmin" && (
-                      <a
-                        href="https://connect.garmin.com/managerConnections"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`text-center text-sm text-gray-400 hover:text-white underline ${protoMono.className}`}
-                      >
-                        Manage on Garmin
-                      </a>
-                    )}
-                  </div>
-                  {disconnectError && (
-                    <p className={`text-red-400 text-xs ${protoMono.className}`}>{disconnectError}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className={`text-sm text-gray-500 ${protoMono.className}`}>No device connected</p>
-                  <Link
-                    href="/"
-                    className="block w-full"
-                  >
-                    <Boton className="w-full py-2">
-                      Connect device (Garmin or Polar)
-                    </Boton>
-                  </Link>
-                </div>
               )}
             </section>
           </>

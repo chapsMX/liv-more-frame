@@ -4,16 +4,12 @@ import sharp from "sharp";
 import { OG_ABI, OG_CONTRACT_ADDRESS } from "@/lib/og-contract";
 import { NextResponse } from "next/server";
 
-const WIDTH_3_2 = 750;
-const HEIGHT_3_2 = 500;
-const NFT_SIZE = 500;
-const LEFT_OFFSET = (WIDTH_3_2 - NFT_SIZE) / 2; // 125
-const BG_RGB = { r: 5, g: 5, b: 15 }; // #05050F
+const SIZE = 500;
 
 /**
  * GET /imagen/[fid]
- * Returns the LivMore OG token image as PNG in 3:2 aspect ratio (share card format).
- * Converts the on-chain SVG to PNG; no text overlays, just background + NFT centered.
+ * Returns the LivMore OG token image as PNG in 1:1 aspect ratio.
+ * Converts the on-chain SVG to PNG.
  */
 export async function GET(
   _request: Request,
@@ -72,26 +68,8 @@ export async function GET(
   }
 
   try {
-    // Render NFT SVG to 500x500 PNG (no extra text)
-    const nftPng = await sharp(svgBuffer)
-      .resize(NFT_SIZE, NFT_SIZE)
-      .png()
-      .toBuffer();
-
-    // 3:2 background (#05050F) + NFT centered, no text
-    const background = await sharp({
-      create: {
-        width: WIDTH_3_2,
-        height: HEIGHT_3_2,
-        channels: 3,
-        background: BG_RGB,
-      },
-    })
-      .png()
-      .toBuffer();
-
-    const png = await sharp(background)
-      .composite([{ input: nftPng, left: LEFT_OFFSET, top: 0 }])
+    const png = await sharp(svgBuffer)
+      .resize(SIZE, SIZE)
       .png()
       .toBuffer();
 

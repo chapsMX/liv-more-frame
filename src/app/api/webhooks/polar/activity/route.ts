@@ -2,27 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 
-const ACTIVITIES_URL = "https://www.polaraccesslink.com/v3/users/activities";
-
 type PolarWebhookPayload = {
   event: string;
-  user_id?: number;
-  date?: string;
-  timestamp?: string;
+  user_id: number;
+  entity_id: string;
+  timestamp: string;
   url?: string;
+};
+
+type PolarActivitySummary = {
+  steps?: number;
+  start_time?: string;
 };
 
 /**
  * Polar AccessLink webhook receiver.
  * Handles PING (webhook registration verification) and ACTIVITY_SUMMARY events.
+ *
+ * Flow: Polar detects new activity -> POSTs here with a URL ->
+ * we GET that URL with the user's access_token -> upsert steps in DB.
  */
 export async function POST(req: NextRequest) {
-  const event = req.headers.get("Polar-Webhook-Event");
-  const signature = req.headers.get("Polar-Webhook-Signature");
-
   const bodyText = await req.text();
 
-  // Verify HMAC signature if secret is configured
+  let payload: PolarWebhookPayload;
+  try {
+    payload = JSON.parse(bodyText);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Respond to PING immediately (before signature check -- Polar sends PING during registration)
+  if (payload.event === "PING") {
+    console.log("[webhooks/polar/activity] PING received");
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
+  // Verify HMAC-SHA256 signature for all other events
+  const signature = req.headers.get("Polar-Webhook-Signature");
   const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
   if (webhookSecret && signature) {
     const expected = crypto
@@ -35,35 +52,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Handle PING (required for webhook creation/activation)
-  if (event === "PING") {
-    console.log("[webhooks/polar/activity] PING received");
+  if (payload.event !== "ACTIVITY_SUMMARY" || !payload.url) {
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
-  let body: PolarWebhookPayload;
   try {
-    body = JSON.parse(bodyText);
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  if (body.event !== "ACTIVITY_SUMMARY" || !body.user_id || !body.date) {
-    return NextResponse.json({ ok: true }, { status: 200 });
-  }
-
-  // Process asynchronously so we return 200 quickly
-  processActivity(body.user_id, body.date).catch((err) => {
+    await processActivity(payload);
+  } catch (err) {
     console.error("[webhooks/polar/activity] processActivity error:", err);
-  });
+  }
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
 
-async function processActivity(polarUserId: number, date: string) {
-  const today = new Date().toISOString().split("T")[0];
-  if (date === today) return; // day not finished
-
+async function processActivity(payload: PolarWebhookPayload) {
   // 1. Look up connection by polar_user_id
   const connRows = await sql`
     SELECT
@@ -71,7 +73,7 @@ async function processActivity(polarUserId: number, date: string) {
       pc2.access_token
     FROM "2026_polar_connections" pc2
     INNER JOIN "2026_provider_connections" pc ON pc.id = pc2.connection_id
-    WHERE pc2.polar_user_id = ${polarUserId}
+    WHERE pc2.polar_user_id = ${payload.user_id}
       AND pc.disconnected_at IS NULL
     LIMIT 1
   `;
@@ -79,8 +81,8 @@ async function processActivity(polarUserId: number, date: string) {
   const row = connRows[0];
   if (!row) {
     console.warn(
-      "[webhooks/polar/activity] No connection found for polar_user_id:",
-      polarUserId
+      "[webhooks/polar/activity] No connection for polar_user_id:",
+      payload.user_id
     );
     return;
   }
@@ -88,15 +90,17 @@ async function processActivity(polarUserId: number, date: string) {
   const userId = row.user_id as number;
   const accessToken = row.access_token as string;
 
-  // 2. Fetch activity data for the given date
-  const res = await fetch(`${ACTIVITIES_URL}/${date}`, {
+  // 2. Fetch the activity data from the URL Polar sent us
+  const activityUrl =
+    payload.url!.startsWith("http") ? payload.url! : `https://${payload.url!}`;
+  const res = await fetch(activityUrl, {
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
   });
 
-  if (res.status === 204) return; // no data for this date
+  if (res.status === 204) return;
 
   if (!res.ok) {
     console.error(
@@ -107,20 +111,37 @@ async function processActivity(polarUserId: number, date: string) {
     return;
   }
 
-  const activity = await res.json();
-  const steps = Number(activity.steps);
+  // Polar may return an object or an array (GET /v3/users/activities/{date} returns single object)
+  const data = await res.json();
+  const activities: PolarActivitySummary[] = Array.isArray(data)
+    ? data
+    : [data];
 
-  if (!Number.isFinite(steps) || steps < 0) return;
+  let upserted = 0;
+  for (const activity of activities) {
+    if (activity.steps == null || !activity.start_time) continue;
 
-  // 3. Upsert into daily steps
-  await sql`
-    INSERT INTO "2026_daily_steps" (user_id, date, steps)
-    VALUES (${userId}, ${date}, ${steps})
-    ON CONFLICT (user_id, date) DO UPDATE SET
-      steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
-  `;
+    const date = activity.start_time.split("T")[0];
+    const steps = Number(activity.steps);
+    if (!Number.isFinite(steps) || steps < 0) continue;
 
-  console.log(
-    `[webhooks/polar/activity] Upserted ${steps} steps for user ${userId} on ${date}`
-  );
+    await sql`
+      INSERT INTO "2026_daily_steps" (user_id, date, steps)
+      VALUES (${userId}, ${date}, ${steps})
+      ON CONFLICT (user_id, date) DO UPDATE SET
+        steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
+    `;
+
+    upserted++;
+    console.log(
+      `[webhooks/polar/activity] Upserted ${steps} steps for user ${userId} on ${date}`
+    );
+  }
+
+  if (upserted === 0 && activities.length > 0) {
+    console.warn(
+      "[webhooks/polar/activity] No activities had steps/start_time. Raw sample:",
+      JSON.stringify(activities[0]).slice(0, 300)
+    );
+  }
 }

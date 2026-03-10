@@ -34,14 +34,10 @@ async function main() {
     "base64"
   );
 
-  const body: Record<string, unknown> = {
-    events: [{ event: "ACTIVITY_SUMMARY" }],
+  const body = {
+    events: ["ACTIVITY_SUMMARY"],
     url: webhookUrl,
   };
-
-  if (webhookSecret) {
-    body.signature_secret_key = webhookSecret;
-  }
 
   const res = await fetch("https://www.polaraccesslink.com/v3/webhooks", {
     method: "POST",
@@ -58,6 +54,8 @@ async function main() {
   if (res.ok || res.status === 201) {
     console.log("Webhook registered successfully!");
     console.log("Response:", text);
+    console.log("\nIMPORTANT: Copy the 'signature_secret_key' from the response above");
+    console.log("and set it as POLAR_WEBHOOK_SECRET in your .env files.");
   } else if (res.status === 409) {
     console.log("Webhook already registered (409). Current config:", text);
     console.log("To update, delete the existing webhook first.");
