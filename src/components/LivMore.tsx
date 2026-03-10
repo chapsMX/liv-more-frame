@@ -13,6 +13,11 @@ import { protoMono } from "../styles/fonts";
 import { Boton } from "../styles/ui/boton";
 import type { AppUser } from "@/types/user";
 import ConnectDevice from "./ConnectDevice";
+import Leaderboard from "./Leaderboard";
+import Steps from "./Steps";
+import OG from "./OG";
+
+type TabId = "home" | "leaderboard" | "steps" | "og";
 
 const EAS_CONTRACT = "0x4200000000000000000000000000000000000021";
 const BASE_RPC = "https://mainnet.base.org";
@@ -101,6 +106,7 @@ export default function LivMore() {
   const [weeklySteps, setWeeklySteps] = useState<{ date: string; steps: number; attestation_hash: string | null }[]>([]);
   const [weeklyStepsLoading, setWeeklyStepsLoading] = useState(false);
   const [attestingDate, setAttestingDate] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("home");
 
   const refetchUser = useCallback(async () => {
     const fid = context?.user?.fid;
@@ -384,8 +390,8 @@ export default function LivMore() {
 
   return (
     <div className={`min-h-screen bg-black text-white flex flex-col ${protoMono.className}`}>
-      {/* Top bar: Liv More | Menú hamburguesa (panel de control) */}
-      <header className="flex justify-between items-center px-3 py-2 pb-0 shrink-0 border-b border-gray-800">
+      {/* Top bar: floating */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-3 py-2 bg-black/95 backdrop-blur-sm border-b border-gray-800">
         <div className="flex items-center gap-2 min-w-0">
           <Image
             src="/livMore_w.png"
@@ -421,9 +427,12 @@ export default function LivMore() {
         </button>
       </header>
 
-      {hasDevice(appUser?.provider) ? (
+      {activeTab === "leaderboard" && <Leaderboard />}
+      {activeTab === "steps" && <Steps />}
+      {activeTab === "og" && <OG />}
+      {activeTab === "home" && hasDevice(appUser?.provider) ? (
         <>
-          <main className="flex-1 flex flex-col items-center px-2 pt-1 gap-1 overflow-auto">
+          <main className="flex-1 flex flex-col items-center px-2 pt-14 pb-16 gap-1 overflow-auto">
             {/* Week title: Week N | YEAR (blanco, un poco más grande) */}
             {(() => {
               const { week, year } = getISOWeekAndYear(new Date());
@@ -502,19 +511,43 @@ export default function LivMore() {
                 </div>
               )}
             </section>
-            { /* aviso atestaciones */}
-            <section className="w-full max-w-sm pt-1 pb-0 shrink-0">
-                  <h2 className={`text-sm text-center font-semibold text-white ${protoMono.className}`}>
-                    Only attested steps count as valid steps for the weekly leaderboard.
-                  </h2>
-                </section>
+            {/* How LivMore Works */}
+            <section className="w-full max-w-sm pt-2 pb-4 shrink-0 space-y-3">
+            <h2 className={`text-base text-center font-semibold text-white ${protoMono.className}`}>
+                How LivMore Works
+              </h2>
+              <div className={`text-sm text-white space-y-3 ${protoMono.className}`}>
+                <p>
+                  Connect your wearable and start tracking your daily steps. Each competition week runs from <span className="font-semibold">Monday to Sunday.</span>
+                </p>
+                <p>
+                  <span className="font-semibold">Attestations are required.</span> Only days you manually attest count toward the weekly leaderboard. Each day closes at <span className="font-semibold">6:00 PM CST (UTC-6)</span> — you can attest any previous day after it has closed.
+                </p>
+                <p>
+                  <span className="font-semibold">Weekly prizes</span> are distributed every week from 100% of tx fees collected in $STEPS tokens:
+                </p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>60% split equally among the <span className="font-semibold">Top 5</span> users with the most attested steps</li>
+                  <li>20% to the <span className="font-semibold">NFT holder</span> with the most attested steps</li>
+                  <li>20% to the <span className="font-semibold">OG minter</span> with the most attested steps</li>
+                </ul>
+                <p>
+                  A single user can win in multiple categories simultaneously.
+                </p>
+                <p>
+                  <span className="font-semibold">OG status</span> is permanently assigned to the 343 original minters and never changes.
+                </p>
+              </div>
+            </section>
           </main>
         </>
-      ) : appUser && hasNoDevice(appUser.provider) ? (
+      ) : activeTab === "home" && appUser && hasNoDevice(appUser.provider) ? (
         ALLOWED_BETA_FIDS.includes(appUser.fid) ? (
-          <ConnectDevice user={appUser} onProviderSet={refetchUser} />
+          <div className="flex-1 flex flex-col pt-14 pb-16 overflow-auto">
+            <ConnectDevice user={appUser} onProviderSet={refetchUser} />
+          </div>
         ) : (
-          <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
+          <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
             <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
               <div className="flex flex-1 items-center justify-center">
                 <Image src="/livMore_w.png" alt="Liv More" width={80} height={80} priority />
@@ -535,18 +568,18 @@ export default function LivMore() {
             </section>
           </main>
         )
-      ) : context?.user?.fid && !userLoadDone ? (
-        <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
+      ) : activeTab === "home" && context?.user?.fid && !userLoadDone ? (
+        <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
           <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin" />
           <p className={protoMono.className}>Loading your account…</p>
         </main>
-      ) : userLoadDone && context?.user?.fid && !appUser ? (
-        <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
+      ) : activeTab === "home" && userLoadDone && context?.user?.fid && !appUser ? (
+        <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
           <p className={`text-gray-400 ${protoMono.className}`}>Could not load your account.</p>
           <Boton onClick={retryUserLoad} className="mt-2">Retry</Boton>
         </main>
-      ) : (
-      <main className="flex-1 flex flex-col items-center justify-center p-2 gap-2 overflow-auto">
+      ) : activeTab === "home" ? (
+      <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
         <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
           <div className="flex flex-1 items-center justify-center">
             <Image
@@ -580,21 +613,43 @@ export default function LivMore() {
           <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
         </section>
       </main>
-      )}
+      ) : null}
 
-      <footer className="w-full py-4 text-center shrink-0 border-t border-gray-800">
-        <p className={`text-gray-500 text-sm ${protoMono.className}`}>
-          built with <span className="text-red-500">❤</span> during ETH Denver
-        </p>
-      </footer>
-
-      {/* Bottom menu: home | leaderboard | steps | og (sin función por ahora) */}
-      <nav className={`w-full shrink-0 border-t border-gray-800 bg-black ${protoMono.className}`} aria-label="Bottom menu">
-        <div className="grid grid-cols-4 text-center">
-          <div className="py-3 text-gray-400" title="Home">🏠</div>
-          <div className="py-3 text-gray-400" title="Leaderboard">📊</div>
-          <div className="py-3 text-gray-400" title="Steps">👟</div>
-          <div className="py-3 text-gray-400" title="OG">✨</div>
+      {/* Bottom menu: floating */}
+      <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-black/95 backdrop-blur-sm ${protoMono.className}`} aria-label="Bottom menu">
+        <div className="grid grid-cols-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className={`py-3 text-center transition-colors ${activeTab === "home" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+            title="Home"
+          >
+            🏠
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("leaderboard")}
+            className={`py-3 text-center transition-colors ${activeTab === "leaderboard" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+            title="Leaderboard"
+          >
+            📊
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("steps")}
+            className={`py-3 text-center transition-colors ${activeTab === "steps" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+            title="Steps"
+          >
+            👟
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("og")}
+            className={`py-3 text-center transition-colors ${activeTab === "og" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+            title="OG"
+          >
+            ✨
+          </button>
         </div>
       </nav>
     </div>

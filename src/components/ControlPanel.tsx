@@ -305,7 +305,7 @@ export default function ControlPanel() {
                   {isOg && context?.user?.fid && (
                     <div className="relative w-[calc(100%+1rem)] -mx-2 aspect-square overflow-hidden rounded-b-lg">
                       <Image
-                        src={`/imagen/${context.user.fid}`}
+                        src={`/imagen/${context.user.fid}/svg`}
                         alt="LivMore OG"
                         fill
                         className="object-cover"
