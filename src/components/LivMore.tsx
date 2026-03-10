@@ -5,11 +5,17 @@ import { useRouter } from "next/navigation";
 import { sdk } from "@farcaster/miniapp-sdk";
 import type { Context } from "@farcaster/miniapp-core";
 import { AddMiniApp } from "@farcaster/miniapp-core";
+import { EAS } from "@ethereum-attestation-service/eas-sdk";
+import { ethers } from "ethers";
+import { HybridSigner } from "@/lib/hybrid-signer";
 import Image from "next/image";
 import { protoMono } from "../styles/fonts";
 import { Boton } from "../styles/ui/boton";
 import type { AppUser } from "@/types/user";
 import ConnectDevice from "./ConnectDevice";
+
+const EAS_CONTRACT = "0x4200000000000000000000000000000000000021";
+const BASE_RPC = "https://mainnet.base.org";
 
 /** Only these FIDs can see Garmin/Polar connection buttons during the update period */
 const ALLOWED_BETA_FIDS = [20701, 343393, 1020677];
@@ -94,6 +100,7 @@ export default function LivMore() {
   const [userLoadDone, setUserLoadDone] = useState(false);
   const [weeklySteps, setWeeklySteps] = useState<{ date: string; steps: number; attestation_hash: string | null }[]>([]);
   const [weeklyStepsLoading, setWeeklyStepsLoading] = useState(false);
+  const [attestingDate, setAttestingDate] = useState<string | null>(null);
 
   const refetchUser = useCallback(async () => {
     const fid = context?.user?.fid;
@@ -128,6 +135,75 @@ export default function LivMore() {
       setUserLoadDone(true);
     }
   }, [context?.user?.fid, context?.user?.username, neynarUser?.username, neynarUser?.custody_address]);
+
+  const handleAttest = useCallback(async (date: string) => {
+    if (!appUser || attestingDate) return;
+    setAttestingDate(date);
+    try {
+      // 1. Farcaster wallet signer (for sendTransaction)
+      const farcasterProvider = new ethers.BrowserProvider(sdk.wallet.ethProvider);
+      const farcasterSigner = await farcasterProvider.getSigner();
+      const walletAddress = await farcasterSigner.getAddress();
+
+      // 2. Hybrid signer: reads via public RPC, writes via Farcaster wallet
+      const readProvider = new ethers.JsonRpcProvider(BASE_RPC);
+      const hybridSigner = new HybridSigner(readProvider, farcasterSigner);
+
+      // 3. Server signs the attestation with user's wallet as recipient (no gas)
+      const signRes = await fetch("/api/attest/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: appUser.id, date, walletAddress }),
+      });
+      const signData = await signRes.json();
+      if (!signData.ok) {
+        console.error("[LivMore] attest/sign error:", signData.error);
+        return;
+      }
+
+      const { signature, message, attester, stepId } = signData;
+
+      // 4. EAS uses hybrid signer — reads go to RPC, writes go to Farcaster
+      const eas = new EAS(EAS_CONTRACT);
+      eas.connect(hybridSigner);
+
+      const tx = await eas.attestByDelegation({
+        schema: signData.schema,
+        data: {
+          recipient: message.recipient,
+          expirationTime: BigInt(message.expirationTime),
+          revocable: message.revocable,
+          refUID: message.refUID,
+          data: message.data,
+          value: BigInt(message.value),
+        },
+        signature,
+        attester,
+        deadline: BigInt(message.deadline),
+      });
+
+      // 5. HybridSigner handles builder code (ERC-8021) automatically in sendTransaction
+      const attestationUID = await tx.wait();
+
+      // 6. Confirm to server to persist in DB
+      await fetch("/api/attest/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId, attestationUID }),
+      });
+
+      // 7. Update local state
+      setWeeklySteps((prev) =>
+        prev.map((s) =>
+          s.date === date ? { ...s, attestation_hash: attestationUID } : s
+        )
+      );
+    } catch (e) {
+      console.error("[LivMore] attest failed:", e);
+    } finally {
+      setAttestingDate(null);
+    }
+  }, [appUser, attestingDate]);
 
   const fetchNeynarUser = useCallback(async (fid: number): Promise<NeynarUser | null> => {
     try {
@@ -347,12 +423,12 @@ export default function LivMore() {
 
       {hasDevice(appUser?.provider) ? (
         <>
-          <main className="flex-1 flex flex-col items-center p-2 gap-2 overflow-auto">
+          <main className="flex-1 flex flex-col items-center px-2 pt-1 gap-1 overflow-auto">
             {/* Week title: Week N | YEAR (blanco, un poco más grande) */}
             {(() => {
               const { week, year } = getISOWeekAndYear(new Date());
               return (
-                <section className="w-full max-w-sm pt-3 pb-0 shrink-0">
+                <section className="w-full max-w-sm pb-0 shrink-0">
                   <h2 className={`text-base text-center font-semibold text-white ${protoMono.className}`}>
                    🟢 | Week {week} | {year} | 🟢 
                   </h2>
@@ -361,7 +437,7 @@ export default function LivMore() {
             })()}
 
             {/* Tabla: Date | Steps | Attestation (orden descendente) */}
-            <section className="w-full max-w-sm pt-2 pb-0 shrink-0">
+            <section className="w-full max-w-sm pb-0 shrink-0">
               {weeklyStepsLoading ? (
                 <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
               ) : (
@@ -378,7 +454,9 @@ export default function LivMore() {
                       {[...weeklyDates].reverse().map((date) => {
                         const steps = stepsByDate.get(date);
                         const attestationHash = attestationByDate.get(date);
-                        const hasAttested = !!attestationHash;
+                        const isAttesting = attestingDate === date;
+                        const today = new Date().toISOString().split("T")[0];
+                        const canAttest = steps !== undefined && steps > 0 && !attestationHash && date < today;
                         return (
                           <tr key={date} className="border-b border-gray-800 last:border-0">
                             <td className="py-2 px-3 text-gray-300">
@@ -388,16 +466,32 @@ export default function LivMore() {
                               {steps !== undefined ? steps.toLocaleString() : "—"}
                             </td>
                             <td className="py-2 px-3 text-center">
-                              {hasAttested ? (
-                                <span className="text-green-500" aria-label="Attested">✓</span>
-                              ) : (
+                              {attestationHash ? (
+                                <a
+                                  href={`https://base.easscan.org/attestation/view/${attestationHash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-green-500 hover:text-green-400 text-xs"
+                                  aria-label="View attestation"
+                                >
+                                  <span>✓</span>
+                                  <span className="underline">View</span>
+                                </a>
+                              ) : isAttesting ? (
+                                <span className="inline-flex items-center gap-1 text-yellow-400 text-xs">
+                                  <span className="w-3 h-3 border-t-2 border-yellow-400 rounded-full animate-spin" />
+                                  Attesting…
+                                </span>
+                              ) : canAttest ? (
                                 <button
                                   type="button"
-                                  className={`text-gray-400 hover:text-white text-xs underline ${protoMono.className}`}
-                                  disabled
+                                  onClick={() => handleAttest(date)}
+                                  className={`text-[#ff8800] hover:text-white text-xs underline ${protoMono.className}`}
                                 >
                                   Attest
                                 </button>
+                              ) : (
+                                <span className="text-gray-600 text-xs">—</span>
                               )}
                             </td>
                           </tr>
@@ -409,7 +503,7 @@ export default function LivMore() {
               )}
             </section>
             { /* aviso atestaciones */}
-            <section className="w-full max-w-sm pt-3 pb-0 shrink-0">
+            <section className="w-full max-w-sm pt-1 pb-0 shrink-0">
                   <h2 className={`text-sm text-center font-semibold text-white ${protoMono.className}`}>
                     Only attested steps count as valid steps for the weekly leaderboard.
                   </h2>

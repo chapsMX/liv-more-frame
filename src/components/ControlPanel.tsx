@@ -160,10 +160,10 @@ export default function ControlPanel() {
       if (data.success) {
         setDeviceProvider(null);
       } else {
-        setDisconnectError(data.error ?? "Error al desconectar");
+        setDisconnectError(data.error ?? "Error disconnecting device from provider connection");
       }
     } catch (e) {
-      setDisconnectError(e instanceof Error ? e.message : "Error al desconectar");
+      setDisconnectError(e instanceof Error ? e.message : "Error disconnecting device from provider connection in user table");
     } finally {
       setDisconnectLoading(false);
     }
@@ -281,7 +281,7 @@ export default function ControlPanel() {
                       disabled={disconnectLoading}
                       className="w-full py-2 bg-red-900/50 border-red-700 hover:bg-red-900/70"
                     >
-                      {disconnectLoading ? "Desconectando…" : `Desconectar ${deviceProvider === "garmin" ? "Garmin" : "Polar"}`}
+                      {disconnectLoading ? "Disconnecting…" : `Disconnect ${deviceProvider === "garmin" ? "Garmin" : "Polar"}`}
                     </Boton>
                     {deviceProvider === "garmin" && (
                       <a
@@ -290,7 +290,7 @@ export default function ControlPanel() {
                         rel="noopener noreferrer"
                         className={`text-center text-sm text-gray-400 hover:text-white underline ${protoMono.className}`}
                       >
-                        Gestionar conexión en Garmin
+                        Manage on Garmin
                       </a>
                     )}
                   </div>
