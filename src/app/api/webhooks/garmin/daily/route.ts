@@ -42,11 +42,14 @@ export async function POST(req: NextRequest) {
   }
 
   const garminUserIds = [...new Set(dailies.map((d) => d.userId).filter(Boolean))];
+  const sampleToken = dailies[0]?.userAccessToken?.slice(0, 30) ?? "none";
   console.log(
     "[webhooks/garmin/daily] Received",
     dailies.length,
-    "dailies for Garmin user(s):",
-    garminUserIds.join(", ") || "(no userId in payload)"
+    "dailies. Garmin userId(s):",
+    garminUserIds.join(", ") || "(none)",
+    "| userAccessToken sample (first 30):",
+    sampleToken + "..."
   );
 
   // Respond 200 immediately — Garmin has ~30s timeout and will retry if no 200
@@ -67,23 +70,49 @@ type ConnRow = {
 async function processDailies(dailies: GarminDailySummary[]) {
   if (dailies.length === 0) return;
 
-  const today = new Date().toISOString().split("T")[0];
-
   // 1. Batch lookup: get all connections for unique tokens in one query
   const tokens = [...new Set(dailies.map((d) => d.userAccessToken).filter(Boolean))];
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    console.warn("[webhooks/garmin/daily] No userAccessToken in any summary");
+    return;
+  }
 
-  const connRows = (await sql`
-    SELECT
-      gc.access_token,
-      pc.user_id,
-      gc.id AS garmin_connection_id,
-      gc.garmin_user_id
-    FROM "2026_garmin_connections" gc
-    INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
-    WHERE gc.access_token = ANY(${tokens})
-      AND pc.disconnected_at IS NULL
-  `) as ConnRow[];
+  let connRows: ConnRow[];
+  try {
+    connRows = (await sql`
+      SELECT
+        gc.access_token,
+        pc.user_id,
+        gc.id AS garmin_connection_id,
+        gc.garmin_user_id
+      FROM "2026_garmin_connections" gc
+      INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+      WHERE gc.access_token = ANY(${tokens})
+        AND pc.disconnected_at IS NULL
+    `) as ConnRow[];
+  } catch (err) {
+    console.error("[webhooks/garmin/daily] Batch connection lookup failed, trying per-token:", err);
+    // Fallback: per-token lookup (old behavior)
+    connRows = [];
+    for (const token of tokens) {
+      const rows = (await sql`
+        SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
+        FROM "2026_garmin_connections" gc
+        INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+        WHERE gc.access_token = ${token} AND pc.disconnected_at IS NULL
+      `) as ConnRow[];
+      connRows.push(...rows);
+    }
+  }
+
+  console.log(
+    "[webhooks/garmin/daily] Found",
+    connRows.length,
+    "connection(s) for",
+    tokens.length,
+    "token(s). Tokens in DB:",
+    connRows.map((r) => r.access_token.slice(0, 12) + "...").join(", ") || "none"
+  );
 
   const connByToken = new Map<string, ConnRow>();
   for (const row of connRows) {
@@ -97,10 +126,33 @@ async function processDailies(dailies: GarminDailySummary[]) {
   for (const summary of dailies) {
     if (!summary.userAccessToken || summary.calendarDate == null) continue;
 
-    const row = connByToken.get(summary.userAccessToken);
+    let row = connByToken.get(summary.userAccessToken);
+    if (!row && summary.userId) {
+      // Fallback: lookup by garmin_user_id (Health API may use different token format)
+      const byGarminUserId = (await sql`
+        SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
+        FROM "2026_garmin_connections" gc
+        INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+        WHERE gc.garmin_user_id = ${summary.userId}
+          AND pc.disconnected_at IS NULL
+        LIMIT 1
+      `) as ConnRow[];
+      row = byGarminUserId[0];
+      if (row) {
+        connByToken.set(summary.userAccessToken, row);
+        console.log(
+          "[webhooks/garmin/daily] Matched by garmin_user_id. userId:",
+          summary.userId
+        );
+      }
+    }
     if (!row) {
       console.warn(
-        "[webhooks/garmin/daily] No connection found for summary, skipping. calendarDate:",
+        "[webhooks/garmin/daily] No connection found. userAccessToken (first 20):",
+        summary.userAccessToken.slice(0, 20) + "...",
+        "garmin userId:",
+        summary.userId,
+        "calendarDate:",
         summary.calendarDate,
         "steps:",
         summary.steps
@@ -118,12 +170,19 @@ async function processDailies(dailies: GarminDailySummary[]) {
       backfillUpdates.push({ id: row.garmin_connection_id, garminUserId: summary.userId });
     }
 
-    if (summary.calendarDate === today) continue;
-
+    // Save today too — needed for "attest yesterday when today has activity" trigger
     const steps = Number(summary.steps);
     if (!Number.isFinite(steps) || steps < 0) continue;
 
     toUpsert.push({ userId, date: summary.calendarDate, steps });
+  }
+
+  if (toUpsert.length === 0) {
+    console.log(
+      "[webhooks/garmin/daily] No rows to upsert (all filtered or no connection). Dailies:",
+      dailies.map((d) => ({ date: d.calendarDate, steps: d.steps }))
+    );
+    return;
   }
 
   // 3. Batch backfill garmin_user_id (rare, usually 0-1)
@@ -135,23 +194,33 @@ async function processDailies(dailies: GarminDailySummary[]) {
     `;
   }
 
-  // 4. Batch upsert steps in one query
-  if (toUpsert.length === 0) return;
+  // 4. Upsert steps — try batch first, fallback to individual
+  try {
+    const userIds = toUpsert.map((r) => r.userId);
+    const dates = toUpsert.map((r) => r.date);
+    const stepsArr = toUpsert.map((r) => r.steps);
 
-  const userIds = toUpsert.map((r) => r.userId);
-  const dates = toUpsert.map((r) => r.date);
-  const stepsArr = toUpsert.map((r) => r.steps);
-
-  await sql`
-    INSERT INTO "2026_daily_steps" (user_id, date, steps)
-    SELECT * FROM UNNEST(
-      ${userIds}::int[],
-      ${dates}::date[],
-      ${stepsArr}::int[]
-    ) AS t(user_id, date, steps)
-    ON CONFLICT (user_id, date) DO UPDATE SET
-      steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
-  `;
+    await sql`
+      INSERT INTO "2026_daily_steps" (user_id, date, steps)
+      SELECT * FROM UNNEST(
+        ${userIds}::int[],
+        ${dates}::date[],
+        ${stepsArr}::int[]
+      ) AS t(user_id, date, steps)
+      ON CONFLICT (user_id, date) DO UPDATE SET
+        steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
+    `;
+  } catch (batchErr) {
+    console.error("[webhooks/garmin/daily] Batch upsert failed, falling back to individual:", batchErr);
+    for (const r of toUpsert) {
+      await sql`
+        INSERT INTO "2026_daily_steps" (user_id, date, steps)
+        VALUES (${r.userId}, ${r.date}, ${r.steps})
+        ON CONFLICT (user_id, date) DO UPDATE SET
+          steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
+      `;
+    }
+  }
 
   for (const r of toUpsert) {
     console.log(

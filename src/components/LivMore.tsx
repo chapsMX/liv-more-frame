@@ -139,7 +139,7 @@ export default function LivMore() {
     }
   }, [context?.user?.fid, context?.user?.username, neynarUser?.username, neynarUser?.custody_address]);
 
-  const handleAttest = useCallback(async (date: string) => {
+  const handleAttest = useCallback(async (date: string, steps?: number) => {
     if (!appUser || attestingDate) return;
     setAttestingDate(date);
     try {
@@ -201,12 +201,27 @@ export default function LivMore() {
           s.date === date ? { ...s, attestation_hash: attestationUID } : s
         )
       );
+
+      // 8. Offer to share
+      const easLink = `https://base.easscan.org/attestation/view/${attestationUID}`;
+      const stepsNum = steps ?? 0;
+      const dateFormatted = formatDateDayWeekMonth(date);
+      const shareText = `Check this attestation on @base by @livmore
+Obtained: ${dateFormatted}
+Steps: ${stepsNum.toLocaleString()}
+
+Tracking healthy habits, one step at a time 👟`;
+      try {
+        await sdk.actions.composeCast({ text: shareText, embeds: [easLink] });
+      } catch (shareErr) {
+        console.warn("[LivMore] composeCast after attest:", shareErr);
+      }
     } catch (e) {
       console.error("[LivMore] attest failed:", e);
     } finally {
       setAttestingDate(null);
     }
-  }, [appUser, attestingDate]);
+  }, [appUser, attestingDate, context?.user?.fid]);
 
   const fetchNeynarUser = useCallback(async (fid: number): Promise<NeynarUser | null> => {
     try {
@@ -425,7 +440,18 @@ export default function LivMore() {
       </header>
 
       {activeTab === "leaderboard" && <Leaderboard />}
-      {activeTab === "steps" && <Steps />}
+      {activeTab === "steps" && (
+        <Steps
+          currentUserFid={context?.user?.fid}
+          onShareLeaderboard={async (shareUrl, shareText) => {
+            try {
+              await sdk.actions.composeCast({ text: shareText, embeds: [shareUrl] });
+            } catch (e) {
+              console.warn("[LivMore] composeCast leaderboard:", e);
+            }
+          }}
+        />
+      )}
       {activeTab === "og" && <OG />}
       {activeTab === "home" && hasDevice(appUser?.provider) ? (
         <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
@@ -517,7 +543,7 @@ export default function LivMore() {
                               ) : canAttest ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleAttest(date)}
+                                  onClick={() => handleAttest(date, steps)}
                                   className={`text-[#ff8800] hover:text-white text-xs underline ${protoMono.className}`}
                                 >
                                   Attest

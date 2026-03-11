@@ -89,7 +89,18 @@ function LeaderboardRow({
   );
 }
 
-export default function Steps() {
+function todayYYYYMMDD(): string {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export default function Steps({
+  currentUserFid,
+  onShareLeaderboard,
+}: {
+  currentUserFid?: number;
+  onShareLeaderboard?: (shareUrl: string, shareText: string) => Promise<void>;
+}) {
   const [tab, setTab] = useState<"current" | "history">("current");
   const [competition, setCompetition] = useState<Competition | null>(null);
   const [general, setGeneral] = useState<Entry[]>([]);
@@ -98,6 +109,10 @@ export default function Steps() {
   const [displayNameMap, setDisplayNameMap] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [selectedWeek, setSelectedWeek] = useState(0);
+  const [sharing, setSharing] = useState(false);
+
+  const myEntry = currentUserFid ? general.find((e) => e.fid === currentUserFid) : undefined;
+  const appUrl = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, "") ?? "";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,6 +221,29 @@ export default function Steps() {
                 />
               ))}
             </div>
+          )}
+
+          {myEntry && competition && onShareLeaderboard && appUrl && (
+            <button
+              type="button"
+              onClick={async () => {
+                setSharing(true);
+                try {
+                  const date = todayYYYYMMDD();
+                  const shareUrl = `${appUrl}/share/leaderboard/fid/${competition.id}-${myEntry.fid}-${date}`;
+                  const shareText = `I'm #${myEntry.rank} on the Weekly Leaderboard with ${formatSteps(myEntry.total_valid_steps)} steps! 👟\n\nTracking healthy habits, one step at a time with @livmore`;
+                  await onShareLeaderboard(shareUrl, shareText);
+                } catch (e) {
+                  console.warn("[Steps] share failed:", e);
+                } finally {
+                  setSharing(false);
+                }
+              }}
+              disabled={sharing}
+              className="mt-4 w-full py-3 px-4 rounded-lg bg-[#ff8800] text-white font-semibold text-sm uppercase tracking-wider hover:bg-[#e67a00] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {sharing ? "Opening…" : "Share my position"}
+            </button>
           )}
 
           <p className="text-gray-500 text-xs text-center mt-5 tracking-wide">
