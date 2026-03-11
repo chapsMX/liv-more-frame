@@ -23,7 +23,7 @@ const EAS_CONTRACT = "0x4200000000000000000000000000000000000021";
 const BASE_RPC = "https://mainnet.base.org";
 
 /** Only these FIDs can see Garmin/Polar connection buttons during the update period */
-const ALLOWED_BETA_FIDS = [20701, 343393, 1020677];
+const ALLOWED_BETA_FIDS = [20701, 343393, 1020677, 448043, 348971];
 
 /** Returns yesterday's date in UTC as YYYY-MM-DD */
 function getYesterdayUTC(): string {
@@ -32,36 +32,27 @@ function getYesterdayUTC(): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Returns from (7 days ago) and to (yesterday) in UTC YYYY-MM-DD for the weekly range */
-function getLast7DaysRange(): { from: string; to: string } {
+/** Returns from (10 days before yesterday) and to (yesterday) in UTC YYYY-MM-DD. Never includes today. */
+function getLast10DaysRange(): { from: string; to: string } {
   const to = getYesterdayUTC();
   const d = new Date(to + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() - 6);
+  d.setUTCDate(d.getUTCDate() - 9);
   const from = d.toISOString().slice(0, 10);
   return { from, to };
 }
 
-/** ISO week number and year for a date */
-function getISOWeekAndYear(d: Date): { week: number; year: number } {
-  const date = new Date(d.getTime());
-  date.setHours(0, 0, 0, 0);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  const thursday = new Date(date);
-  thursday.setDate(diff + 3);
-  const year = thursday.getFullYear();
-  const startOfYear = new Date(year, 0, 1);
-  const week = Math.ceil((((thursday.getTime() - startOfYear.getTime()) / 86400000) + 1) / 7);
-  return { week, year };
+/** Format YYYY-MM-DD as "Mon 09 March" (short day, day, month) */
+function formatDateDayWeekMonth(dateStr: string): string {
+  const d = new Date(dateStr + (dateStr.includes("T") ? "" : "T12:00:00Z"));
+  const dayOfWeek = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+  const day = d.getUTCDate();
+  const month = d.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+  return `${dayOfWeek} ${String(day).padStart(2, "0")} ${month}`;
 }
 
-/** Format YYYY-MM-DD as "Mon, D, YYYY" (e.g. Mar, 7, 2026) */
-function formatDateMonthDayYear(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00Z");
-  const month = d.toLocaleString("en-US", { month: "short" });
-  const day = d.getUTCDate();
-  const year = d.getUTCFullYear();
-  return `${month}, ${day}, ${year}`;
+function formatSteps(n: number | string): string {
+  const num = typeof n === "string" ? parseInt(n, 10) : n;
+  return Number.isNaN(num) ? "0" : num.toLocaleString("en-US");
 }
 
 /** User has a device connected (from 2026_users.provider) */
@@ -107,6 +98,7 @@ export default function LivMore() {
   const [weeklyStepsLoading, setWeeklyStepsLoading] = useState(false);
   const [attestingDate, setAttestingDate] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [homeTab, setHomeTab] = useState<"activity" | "instructions">("activity");
 
   const refetchUser = useCallback(async () => {
     const fid = context?.user?.fid;
@@ -327,13 +319,13 @@ export default function LivMore() {
     }
   }, [sdkReady, context?.user?.fid, refetchUser]);
 
-  // Fetch last 7 days of steps when user has a device (Garmin/Polar)
+  // Fetch last 10 days of steps (yesterday back) when user has a device (Garmin/Polar)
   useEffect(() => {
     if (!appUser?.fid || !hasDevice(appUser.provider)) {
       setWeeklySteps([]);
       return;
     }
-    const { from, to } = getLast7DaysRange();
+    const { from, to } = getLast10DaysRange();
     setWeeklyStepsLoading(true);
     fetch(`/api/steps/daily?fid=${appUser.fid}&from=${from}&to=${to}`)
       .then((res) => res.json())
@@ -354,9 +346,9 @@ export default function LivMore() {
       .finally(() => setWeeklyStepsLoading(false));
   }, [appUser?.fid, appUser?.provider]);
 
-  // Last 7 calendar days (from to to) for table rows — same range we request from API
-  const weeklyDates = (() => {
-    const { from, to } = getLast7DaysRange();
+  // Last 10 calendar days (yesterday back) for table rows — same range we request from API
+  const activityDates = (() => {
+    const { from, to } = getLast10DaysRange();
     const dates: string[] = [];
     const d = new Date(from + "T12:00:00Z");
     const end = new Date(to + "T12:00:00Z");
@@ -431,48 +423,70 @@ export default function LivMore() {
       {activeTab === "steps" && <Steps />}
       {activeTab === "og" && <OG />}
       {activeTab === "home" && hasDevice(appUser?.provider) ? (
-        <>
-          <main className="flex-1 flex flex-col items-center px-2 pt-14 pb-16 gap-1 overflow-auto">
-            {/* Week title: Week N | YEAR (blanco, un poco más grande) */}
-            {(() => {
-              const { week, year } = getISOWeekAndYear(new Date());
-              return (
-                <section className="w-full max-w-sm pb-0 shrink-0">
-                  <h2 className={`text-base text-center font-semibold text-white ${protoMono.className}`}>
-                   🟢 | Week {week} | {year} | 🟢 
-                  </h2>
-                </section>
-              );
-            })()}
+        <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
+          <h1 className="text-xl text-center font-semibold text-white mb-4">One Step at a Time</h1>
 
-            {/* Tabla: Date | Steps | Attestation (orden descendente) */}
-            <section className="w-full max-w-sm pb-0 shrink-0">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-700 mb-4">
+            <button
+              type="button"
+              onClick={() => setHomeTab("activity")}
+              className={`flex-1 py-3 text-sm uppercase tracking-wider transition-colors ${
+                homeTab === "activity"
+                  ? "text-white border-b-2 border-[#ff8800]"
+                  : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
+              }`}
+            >
+              Latest Activity
+            </button>
+            <button
+              type="button"
+              onClick={() => setHomeTab("instructions")}
+              className={`flex-1 py-3 text-sm uppercase tracking-wider transition-colors ${
+                homeTab === "instructions"
+                  ? "text-white border-b-2 border-[#ff8800]"
+                  : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
+              }`}
+            >
+              How LivMore works!
+            </button>
+          </div>
+
+          {/* Latest Activity tab */}
+          {homeTab === "activity" && (
+            <section className="w-full max-w-sm mx-auto">
               {weeklyStepsLoading ? (
-                <p className={`text-gray-500 text-sm ${protoMono.className}`}>Loading…</p>
+                <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
               ) : (
                 <div className={`overflow-hidden rounded-lg border border-gray-700 ${protoMono.className}`}>
-                  <table className="w-full text-sm pb-0 mb-0">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-white border-b border-gray-700 pb-0 mb-0">
-                        <th className="text-left py-2 px-3 text-white font-semibold">Date</th>
-                        <th className="text-right py-2 px-3 text-white font-semibold">Steps</th>
-                        <th className="text-center py-2 px-3 text-white font-semibold">Attestation</th>
+                      <tr className="text-white border-b border-gray-700">
+                        <th className="text-left py-2 px-3 font-semibold">Date</th>
+                        <th className="text-right py-2 px-3 font-semibold">Steps</th>
+                        <th className="text-center py-2 px-3 font-semibold">Attestation</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {[...weeklyDates].reverse().map((date) => {
+                      {[...activityDates].reverse().map((date, index) => {
                         const steps = stepsByDate.get(date);
                         const attestationHash = attestationByDate.get(date);
                         const isAttesting = attestingDate === date;
                         const today = new Date().toISOString().split("T")[0];
-                        const canAttest = steps !== undefined && steps > 0 && !attestationHash && date < today;
+                        const isFirstRecord = index === 0;
+                        const canAttest =
+                          !isFirstRecord &&
+                          steps !== undefined &&
+                          steps > 0 &&
+                          !attestationHash &&
+                          date < today;
                         return (
                           <tr key={date} className="border-b border-gray-800 last:border-0">
                             <td className="py-2 px-3 text-gray-300">
-                              {formatDateMonthDayYear(date)}
+                              {formatDateDayWeekMonth(date)}
                             </td>
                             <td className="py-2 px-3 text-right text-white font-medium">
-                              {steps !== undefined ? steps.toLocaleString() : "—"}
+                              {steps !== undefined ? formatSteps(steps) : "—"}
                             </td>
                             <td className="py-2 px-3 text-center">
                               {attestationHash ? (
@@ -510,12 +524,15 @@ export default function LivMore() {
                   </table>
                 </div>
               )}
+              <p className="text-gray-500 text-xs text-center mt-5 tracking-wide">
+                Only attested days count toward the weekly leaderboard.
+              </p>
             </section>
-            {/* How LivMore Works */}
-            <section className="w-full max-w-sm pt-2 pb-4 shrink-0 space-y-3">
-            <h2 className={`text-base text-center font-semibold text-white ${protoMono.className}`}>
-                How LivMore Works
-              </h2>
+          )}
+
+          {/* Instructions / How to tab */}
+          {homeTab === "instructions" && (
+            <section className="w-full max-w-sm mx-auto space-y-3">
               <div className={`text-sm text-white space-y-3 ${protoMono.className}`}>
                 <p>
                   Connect your wearable and start tracking your daily steps. Each competition week runs from <span className="font-semibold">Monday to Sunday.</span>
@@ -539,8 +556,8 @@ export default function LivMore() {
                 </p>
               </div>
             </section>
-          </main>
-        </>
+          )}
+        </main>
       ) : activeTab === "home" && appUser && hasNoDevice(appUser.provider) ? (
         ALLOWED_BETA_FIDS.includes(appUser.fid) ? (
           <div className="flex-1 flex flex-col pt-14 pb-16 overflow-auto">

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { protoMono } from "@/styles/fonts";
 import type { AppUser } from "@/types/user";
 
@@ -8,6 +9,15 @@ type ConnectDeviceProps = {
   user: AppUser;
   onProviderSet?: () => void;
 };
+
+async function openAuthUrl(path: string) {
+  const url = `${window.location.origin}${path}`;
+  try {
+    await sdk.actions.openUrl(url);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
 
 export default function ConnectDevice({ user }: ConnectDeviceProps) {
   return (
@@ -37,24 +47,22 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
           Connect device
         </h2>
-        <a
-          href={`/api/auth/garmin-v1?fid=${user.fid}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => openAuthUrl(`/api/auth/garmin-v1?fid=${user.fid}`)}
           className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#ff8800] text-[#ff8800] hover:bg-[#ff8800] hover:text-white rounded-full min-w-[80px] transition-colors"
         >
           Connect Garmin
-        </a>
-        <a
-          href={`/api/auth/polar?fid=${user.fid}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        </button>
+        <button
+          type="button"
+          onClick={() => openAuthUrl(`/api/auth/polar?fid=${user.fid}`)}
           className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#d4003c] text-[#d4003c] hover:bg-[#d4003c] hover:text-white rounded-full min-w-[80px] transition-colors"
         >
           Connect Polar
-        </a>
+        </button>
         <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
-          Both connections open in a new tab. After authorizing, close that tab and return here.
+          Both connections open in your browser. Once connected, close the browser window, return to the miniapp and refresh it.
         </p>
         <p className={`text-gray-600 text-xs text-center mt-1 ${protoMono.className}`}>
           Account FID: {user.fid}
