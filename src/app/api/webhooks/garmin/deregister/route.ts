@@ -11,16 +11,21 @@ type DeregistrationPayload = {
 };
 
 export async function POST(req: NextRequest) {
-  let body: DeregistrationPayload;
+  let body: DeregistrationPayload = {};
+
   try {
-    body = await req.json();
+    const text = await req.text();
+    if (text) {
+      body = JSON.parse(text);
+    }
+    // Si el body está vacío, body queda como {} → lista vacía → 200 OK ✅
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    // Body malformado: igual respondemos 200 para no fallar el ping de Garmin
+    console.warn("[webhooks/garmin/deregister] invalid JSON body, ignoring");
   }
 
   const list = body.deregistrations ?? [];
 
-  // ⚡ Responder 200 inmediatamente — igual que dailies
   processDeregistrations(list).catch((err) => {
     console.error("[webhooks/garmin/deregister] error:", err);
   });

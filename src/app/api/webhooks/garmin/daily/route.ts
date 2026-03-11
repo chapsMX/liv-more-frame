@@ -21,13 +21,27 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
+    console.warn("[webhooks/garmin/daily] Invalid JSON or empty body");
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const dailies = body.dailies;
   if (!Array.isArray(dailies)) {
+    console.log(
+      "[webhooks/garmin/daily] Received request but dailies is missing or not array. Keys:",
+      body ? Object.keys(body) : "null",
+      "dailies type:",
+      typeof dailies
+    );
     return NextResponse.json({ ok: true }, { status: 200 });
   }
+
+  if (dailies.length === 0) {
+    console.log("[webhooks/garmin/daily] Received dailies array is empty");
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
+  console.log("[webhooks/garmin/daily] Received", dailies.length, "dailies");
 
   // Respond 200 immediately — Garmin has ~30s timeout and will retry if no 200
   processDailies(dailies).catch((err) => {
@@ -59,7 +73,15 @@ async function processDailies(dailies: GarminDailySummary[]) {
     `;
 
     const row = connRows[0];
-    if (!row) continue;
+    if (!row) {
+      console.warn(
+        "[webhooks/garmin/daily] No connection found for summary, skipping. calendarDate:",
+        summary.calendarDate,
+        "steps:",
+        summary.steps
+      );
+      continue;
+    }
 
     const userId = row.user_id as number;
     const garminConnectionId = row.garmin_connection_id as number;
@@ -89,5 +111,8 @@ async function processDailies(dailies: GarminDailySummary[]) {
       ON CONFLICT (user_id, date) DO UPDATE SET
         steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
     `;
+    console.log(
+      `[webhooks/garmin/daily] Upserted ${steps} steps for user ${userId} on ${summary.calendarDate}`
+    );
   }
 }

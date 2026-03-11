@@ -249,7 +249,7 @@ export default function ControlPanel() {
                   <p className={`text-sm text-white flex items-center gap-1 flex-wrap ${protoMono.className}`}>
                     <span className="text-white">Miniapp:</span>
                     {added && notificationDetails?.token ? (
-                      <span className="text-gray-300">Installed and notifis enabled</span>
+                      <span className="text-gray-300">Installed & notis enabled</span>
                     ) : added ? (
                       <span className="text-gray-300">Installed</span>
                     ) : (

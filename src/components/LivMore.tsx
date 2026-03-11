@@ -25,6 +25,11 @@ const BASE_RPC = "https://mainnet.base.org";
 /** Only these FIDs can see Garmin/Polar connection buttons during the update period */
 const ALLOWED_BETA_FIDS = [20701, 343393, 1020677, 448043, 348971];
 
+/** Returns today's date in UTC as YYYY-MM-DD */
+function getTodayUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /** Returns yesterday's date in UTC as YYYY-MM-DD */
 function getYesterdayUTC(): string {
   const d = new Date();
@@ -32,9 +37,9 @@ function getYesterdayUTC(): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Returns from (10 days before yesterday) and to (yesterday) in UTC YYYY-MM-DD. Never includes today. */
+/** Returns from (9 days before today) and to (today) in UTC YYYY-MM-DD. Includes today. */
 function getLast10DaysRange(): { from: string; to: string } {
-  const to = getYesterdayUTC();
+  const to = getTodayUTC();
   const d = new Date(to + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() - 9);
   const from = d.toISOString().slice(0, 10);
@@ -424,7 +429,7 @@ export default function LivMore() {
       {activeTab === "og" && <OG />}
       {activeTab === "home" && hasDevice(appUser?.provider) ? (
         <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
-          <h1 className="text-xl text-center font-semibold text-white mb-4">One Step at a Time</h1>
+          <h1 className="text-xl text-center font-semibold text-white mb-1">One Step at a Time</h1>
 
           {/* Tabs */}
           <div className="flex border-b border-gray-700 mb-4">
@@ -468,18 +473,22 @@ export default function LivMore() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...activityDates].reverse().map((date, index) => {
+                      {[...activityDates].reverse().map((date) => {
                         const steps = stepsByDate.get(date);
                         const attestationHash = attestationByDate.get(date);
                         const isAttesting = attestingDate === date;
-                        const today = new Date().toISOString().split("T")[0];
-                        const isFirstRecord = index === 0;
+                        const today = getTodayUTC();
+                        const yesterday = getYesterdayUTC();
+                        const todaySteps = stepsByDate.get(today) ?? 0;
+                        // Yesterday is attestable only when today has activity (day has turned over)
+                        const canAttestYesterday = date === yesterday && todaySteps > 0;
+                        const canAttestOlder = date < yesterday;
                         const canAttest =
-                          !isFirstRecord &&
                           steps !== undefined &&
                           steps > 0 &&
                           !attestationHash &&
-                          date < today;
+                          date < today &&
+                          (canAttestYesterday || canAttestOlder);
                         return (
                           <tr key={date} className="border-b border-gray-800 last:border-0">
                             <td className="py-2 px-3 text-gray-300">
@@ -524,9 +533,17 @@ export default function LivMore() {
                   </table>
                 </div>
               )}
-              <p className="text-gray-500 text-xs text-center mt-5 tracking-wide">
+              <p className="text-gray-500 text-xs text-center mt-2 tracking-wide">
                 Only attested days count toward the weekly leaderboard.
               </p>
+              {!weeklyStepsLoading &&
+                (stepsByDate.get(getYesterdayUTC()) ?? 0) > 0 &&
+                !attestationByDate.get(getYesterdayUTC()) &&
+                (stepsByDate.get(getTodayUTC()) ?? 0) === 0 && (
+                  <p className="text-gray-500 text-xs text-center mt-2 tracking-wide">
+                    Sync your wearable to see today&apos;s steps and enable Attest for yesterday.
+                  </p>
+                )}
             </section>
           )}
 
@@ -564,8 +581,8 @@ export default function LivMore() {
             <ConnectDevice user={appUser} onProviderSet={refetchUser} />
           </div>
         ) : (
-          <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
-            <div className="flex flex-row items-center justify-center w-full max-w-sm gap-4">
+          <main className="flex-1 flex flex-col items-center justify-center p-2 pt-8 pb-16 gap-2 overflow-auto">
+            <div className="flex flex-row items-center justify-center w-full max-w-sm gap-2">
               <div className="flex flex-1 items-center justify-center">
                 <Image src="/livMore_w.png" alt="Liv More" width={80} height={80} priority />
               </div>
@@ -574,14 +591,14 @@ export default function LivMore() {
               </div>
             </div>
             <p className={`text-gray-400 text-center text-base max-w-sm mt-2 ${protoMono.className}`}>
-              We&apos;re working on updating the app.
+              We&apos;re improving the app and getting ready to launch LivMore ASAP
             </p>
             <p className={`text-gray-500 text-center text-sm max-w-sm ${protoMono.className}`}>
-              Stay tuned for device connection and more.
+              Stay tuned, add the miniapp and turn notifications on to get updates!
             </p>
-            <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
+            <section className={`w-full max-w-sm mt-2 p-2 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
               <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
-              <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
+              <p className="text-sm text-gray-400">Supported devices: Garmin ✅, Polar ✅, Google Fit 🚧</p>
             </section>
           </main>
         )
