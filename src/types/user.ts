@@ -6,6 +6,6 @@ export type AppUser = {
   eth_address?: string | null;
   created_at: string;
   updated_at: string;
-  provider: "garmin" | "polar" | null;
+  provider: "garmin" | "polar" | "oura" | null;
   og: boolean;
 };

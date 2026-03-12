@@ -10,7 +10,7 @@ function toPublicUser(row: Record<string, unknown>) {
     eth_address: row.eth_address,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    provider: row.provider as "garmin" | "polar" | null,
+    provider: row.provider as "garmin" | "polar" | "oura" | null,
     og: Boolean(row.og),
   };
 }
@@ -122,7 +122,7 @@ export type PatchUserBody = {
   fid: number;
   og?: boolean;
   /** Set provider (e.g. after OAuth). Set to null to disconnect and clear tokens. */
-  provider?: "garmin" | "polar" | null;
+  provider?: "garmin" | "polar" | "oura" | null;
   /** Server-only: set by OAuth callback. Do not send from client. */
   provider_access_token?: string | null;
   provider_refresh_token?: string | null;
@@ -173,10 +173,11 @@ export async function PATCH(request: Request) {
       if (
         provider !== null &&
         provider !== "garmin" &&
-        provider !== "polar"
+        provider !== "polar" &&
+        provider !== "oura"
       ) {
         return NextResponse.json(
-          { success: false, error: "provider must be 'garmin', 'polar', or null" },
+          { success: false, error: "provider must be 'garmin', 'polar', 'oura', or null" },
           { status: 400 }
         );
       }

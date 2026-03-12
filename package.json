@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "update-records": "npx tsx scripts/update-records.ts"
+    "update-records": "npx tsx scripts/update-records.ts",
+    "register-oura-webhook": "npx tsx scripts/register-oura-webhook.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",

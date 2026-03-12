@@ -62,7 +62,7 @@ function formatSteps(n: number | string): string {
 
 /** User has a device connected (from 2026_users.provider) */
 function hasDevice(provider: AppUser["provider"] | undefined): boolean {
-  return provider === "garmin" || provider === "polar";
+  return provider === "garmin" || provider === "polar" || provider === "oura";
 }
 
 /** User has no device (null or undefined) */
@@ -329,12 +329,13 @@ Tracking healthy habits, one step at a time 👟`;
   useEffect(() => {
     if (!sdkReady || !context?.user?.fid) return;
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected") {
+    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected" || params?.get("oura") === "success") {
       refetchUser();
       // Clean URL without full reload
       const url = new URL(window.location.href);
       url.searchParams.delete("garmin");
       url.searchParams.delete("polar");
+      url.searchParams.delete("oura");
       window.history.replaceState({}, "", url.pathname + (url.search || ""));
     }
   }, [sdkReady, context?.user?.fid, refetchUser]);

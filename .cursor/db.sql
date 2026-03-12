@@ -11,25 +11,19 @@
           "column_default": "nextval('\"2026_daily_steps_id_seq\"'::regclass)"
         },
         {
-          "column_name": "created_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "NO",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "attested_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "steps",
+          "column_name": "user_id",
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
         },
         {
-          "column_name": "user_id",
+          "column_name": "date",
+          "data_type": "date",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "steps",
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
@@ -41,10 +35,16 @@
           "column_default": null
         },
         {
-          "column_name": "date",
-          "data_type": "date",
-          "is_nullable": "NO",
+          "column_name": "attested_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
           "column_default": null
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
         }
       ]
     },
@@ -52,14 +52,14 @@
       "table_name": "2026_garmin_connections",
       "columns": [
         {
-          "column_name": "token_secret",
+          "column_name": "access_token",
           "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
         },
         {
-          "column_name": "access_token",
-          "data_type": "text",
+          "column_name": "connection_id",
+          "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
         },
@@ -70,48 +70,24 @@
           "column_default": null
         },
         {
-          "column_name": "connection_id",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
           "column_name": "id",
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": "nextval('\"2026_garmin_connections_id_seq\"'::regclass)"
+        },
+        {
+          "column_name": "token_secret",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
         }
       ]
     },
     {
-      "table_name": "2026_polar_connections",
+      "table_name": "2026_oura_connections",
       "columns": [
         {
-          "column_name": "token_expires_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "polar_user_id",
-          "data_type": "bigint",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "connection_id",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "id",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": "nextval('\"2026_polar_connections_id_seq\"'::regclass)"
-        },
-        {
-          "column_name": "member_id",
+          "column_name": "refresh_token",
           "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
@@ -123,16 +99,11 @@
           "column_default": null
         },
         {
-          "column_name": "connected_at",
-          "data_type": "timestamp with time zone",
+          "column_name": "oura_user_id",
+          "data_type": "text",
           "is_nullable": "NO",
-          "column_default": "now()"
-        }
-      ]
-    },
-    {
-      "table_name": "2026_provider_connections",
-      "columns": [
+          "column_default": null
+        },
         {
           "column_name": "connected_at",
           "data_type": "timestamp with time zone",
@@ -140,8 +111,78 @@
           "column_default": "now()"
         },
         {
-          "column_name": "provider",
+          "column_name": "token_expires_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "connection_id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "nextval('\"2026_oura_connections_id_seq\"'::regclass)"
+        }
+      ]
+    },
+    {
+      "table_name": "2026_polar_connections",
+      "columns": [
+        {
+          "column_name": "access_token",
           "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "nextval('\"2026_polar_connections_id_seq\"'::regclass)"
+        },
+        {
+          "column_name": "connection_id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "polar_user_id",
+          "data_type": "bigint",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "token_expires_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "connected_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "member_id",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        }
+      ]
+    },
+    {
+      "table_name": "2026_provider_connections",
+      "columns": [
+        {
+          "column_name": "user_id",
+          "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
         },
@@ -152,16 +193,22 @@
           "column_default": null
         },
         {
+          "column_name": "provider",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
           "column_name": "id",
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": "nextval('\"2026_provider_connections_id_seq\"'::regclass)"
         },
         {
-          "column_name": "user_id",
-          "data_type": "integer",
+          "column_name": "connected_at",
+          "data_type": "timestamp with time zone",
           "is_nullable": "NO",
-          "column_default": null
+          "column_default": "now()"
         }
       ]
     },
@@ -175,14 +222,8 @@
           "column_default": null
         },
         {
-          "column_name": "period_start",
-          "data_type": "date",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "period_end",
-          "data_type": "date",
+          "column_name": "record_type",
+          "data_type": "text",
           "is_nullable": "NO",
           "column_default": null
         },
@@ -193,8 +234,8 @@
           "column_default": "now()"
         },
         {
-          "column_name": "record_type",
-          "data_type": "text",
+          "column_name": "period_end",
+          "data_type": "date",
           "is_nullable": "NO",
           "column_default": null
         },
@@ -209,54 +250,18 @@
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
+        },
+        {
+          "column_name": "period_start",
+          "data_type": "date",
+          "is_nullable": "NO",
+          "column_default": null
         }
       ]
     },
     {
       "table_name": "2026_users",
       "columns": [
-        {
-          "column_name": "provider",
-          "data_type": "text",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "id",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": "nextval('\"2026_users_id_seq\"'::regclass)"
-        },
-        {
-          "column_name": "fid",
-          "data_type": "bigint",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "created_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "NO",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "updated_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "NO",
-          "column_default": "now()"
-        },
-        {
-          "column_name": "og",
-          "data_type": "boolean",
-          "is_nullable": "NO",
-          "column_default": "false"
-        },
-        {
-          "column_name": "provider_token_expires_at",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "YES",
-          "column_default": null
-        },
         {
           "column_name": "provider_access_token",
           "data_type": "text",
@@ -280,12 +285,19 @@
           "data_type": "text",
           "is_nullable": "YES",
           "column_default": null
-        }
-      ]
-    },
-    {
-      "table_name": "2026_weekly_competitions",
-      "columns": [
+        },
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "nextval('\"2026_users_id_seq\"'::regclass)"
+        },
+        {
+          "column_name": "fid",
+          "data_type": "bigint",
+          "is_nullable": "NO",
+          "column_default": null
+        },
         {
           "column_name": "created_at",
           "data_type": "timestamp with time zone",
@@ -293,16 +305,39 @@
           "column_default": "now()"
         },
         {
-          "column_name": "year",
-          "data_type": "smallint",
-          "is_nullable": "NO",
+          "column_name": "provider",
+          "data_type": "text",
+          "is_nullable": "YES",
           "column_default": null
         },
         {
-          "column_name": "accumulated",
-          "data_type": "numeric",
+          "column_name": "provider_token_expires_at",
+          "data_type": "timestamp with time zone",
           "is_nullable": "YES",
-          "column_default": "0"
+          "column_default": null
+        },
+        {
+          "column_name": "og",
+          "data_type": "boolean",
+          "is_nullable": "NO",
+          "column_default": "false"
+        },
+        {
+          "column_name": "updated_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        }
+      ]
+    },
+    {
+      "table_name": "2026_weekly_competitions",
+      "columns": [
+        {
+          "column_name": "week_start",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": null
         },
         {
           "column_name": "status",
@@ -311,26 +346,8 @@
           "column_default": "'active'::text"
         },
         {
-          "column_name": "id",
-          "data_type": "integer",
-          "is_nullable": "NO",
-          "column_default": "nextval('\"2026_weekly_competitions_id_seq\"'::regclass)"
-        },
-        {
-          "column_name": "pool_amount",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "week_end",
-          "data_type": "timestamp with time zone",
-          "is_nullable": "NO",
-          "column_default": null
-        },
-        {
-          "column_name": "week_start",
-          "data_type": "timestamp with time zone",
+          "column_name": "year",
+          "data_type": "smallint",
           "is_nullable": "NO",
           "column_default": null
         },
@@ -339,12 +356,13 @@
           "data_type": "smallint",
           "is_nullable": "NO",
           "column_default": null
-        }
-      ]
-    },
-    {
-      "table_name": "2026_weekly_winners",
-      "columns": [
+        },
+        {
+          "column_name": "id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": "nextval('\"2026_weekly_competitions_id_seq\"'::regclass)"
+        },
         {
           "column_name": "created_at",
           "data_type": "timestamp with time zone",
@@ -352,33 +370,32 @@
           "column_default": "now()"
         },
         {
-          "column_name": "category",
-          "data_type": "text",
+          "column_name": "week_end",
+          "data_type": "timestamp with time zone",
           "is_nullable": "NO",
           "column_default": null
         },
         {
-          "column_name": "prize_tx_hash",
-          "data_type": "text",
+          "column_name": "pool_amount",
+          "data_type": "numeric",
           "is_nullable": "YES",
           "column_default": null
         },
+        {
+          "column_name": "accumulated",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": "0"
+        }
+      ]
+    },
+    {
+      "table_name": "2026_weekly_winners",
+      "columns": [
         {
           "column_name": "prize_amount",
           "data_type": "numeric",
           "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "prize_percentage",
-          "data_type": "numeric",
-          "is_nullable": "YES",
-          "column_default": null
-        },
-        {
-          "column_name": "total_valid_steps",
-          "data_type": "integer",
-          "is_nullable": "NO",
           "column_default": null
         },
         {
@@ -394,7 +411,19 @@
           "column_default": null
         },
         {
-          "column_name": "competition_id",
+          "column_name": "created_at",
+          "data_type": "timestamp with time zone",
+          "is_nullable": "NO",
+          "column_default": "now()"
+        },
+        {
+          "column_name": "category",
+          "data_type": "text",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "total_valid_steps",
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": null
@@ -404,6 +433,24 @@
           "data_type": "integer",
           "is_nullable": "NO",
           "column_default": "nextval('\"2026_weekly_winners_id_seq\"'::regclass)"
+        },
+        {
+          "column_name": "competition_id",
+          "data_type": "integer",
+          "is_nullable": "NO",
+          "column_default": null
+        },
+        {
+          "column_name": "prize_percentage",
+          "data_type": "numeric",
+          "is_nullable": "YES",
+          "column_default": null
+        },
+        {
+          "column_name": "prize_tx_hash",
+          "data_type": "text",
+          "is_nullable": "YES",
+          "column_default": null
         }
       ]
     }
@@ -417,6 +464,12 @@
     },
     {
       "table_name": "2026_garmin_connections",
+      "column_name": "connection_id",
+      "foreign_table_name": "2026_provider_connections",
+      "foreign_column_name": "id"
+    },
+    {
+      "table_name": "2026_oura_connections",
       "column_name": "connection_id",
       "foreign_table_name": "2026_provider_connections",
       "foreign_column_name": "id"
@@ -487,6 +540,21 @@
       "table_name": "2026_garmin_connections",
       "index_name": "2026_garmin_connections_pkey",
       "index_definition": "CREATE UNIQUE INDEX \"2026_garmin_connections_pkey\" ON public.\"2026_garmin_connections\" USING btree (id)"
+    },
+    {
+      "table_name": "2026_oura_connections",
+      "index_name": "2026_oura_connections_connection_id_key",
+      "index_definition": "CREATE UNIQUE INDEX \"2026_oura_connections_connection_id_key\" ON public.\"2026_oura_connections\" USING btree (connection_id)"
+    },
+    {
+      "table_name": "2026_oura_connections",
+      "index_name": "2026_oura_connections_oura_user_id_key",
+      "index_definition": "CREATE UNIQUE INDEX \"2026_oura_connections_oura_user_id_key\" ON public.\"2026_oura_connections\" USING btree (oura_user_id)"
+    },
+    {
+      "table_name": "2026_oura_connections",
+      "index_name": "2026_oura_connections_pkey",
+      "index_definition": "CREATE UNIQUE INDEX \"2026_oura_connections_pkey\" ON public.\"2026_oura_connections\" USING btree (id)"
     },
     {
       "table_name": "2026_polar_connections",

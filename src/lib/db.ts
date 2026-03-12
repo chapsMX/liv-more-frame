@@ -20,7 +20,7 @@ export type User = {
   eth_address: string | null;
   created_at: Date;
   updated_at: Date;
-  provider: "garmin" | "polar" | null;
+  provider: "garmin" | "polar" | "oura" | null;
   og: boolean;
   /** OAuth access token for the connected provider (server-side only) */
   provider_access_token?: string | null;

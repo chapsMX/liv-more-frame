@@ -61,6 +61,13 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         >
           Connect Polar
         </button>
+        <button
+          type="button"
+          onClick={() => openAuthUrl(`/api/auth/oura/connect?fid=${user.fid}`)}
+          className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#00d4aa] text-[#00d4aa] hover:bg-[#00d4aa] hover:text-white rounded-full min-w-[80px] transition-colors"
+        >
+          Connect Oura
+        </button>
         <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
           Both connections open in your browser. Once connected, close the browser window, return to the miniapp and refresh it.
         </p>

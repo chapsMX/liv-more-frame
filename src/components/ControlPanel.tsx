@@ -17,7 +17,7 @@ type NeynarUser = {
 };
 
 /** Provider from 2026_users (device connection) */
-type DeviceProvider = "garmin" | "polar" | null;
+type DeviceProvider = "garmin" | "polar" | "oura" | null;
 
 export default function ControlPanel() {
   const [context, setContext] = useState<Context.MiniAppContext | null>(null);
@@ -292,10 +292,23 @@ export default function ControlPanel() {
                             </a>
                           </>
                         )}
+                        {deviceProvider === "oura" && (
+                          <>
+                            <span className="text-gray-600">·</span>
+                            <a
+                              href="https://cloud.ouraring.com"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-400 hover:text-amber-300 underline"
+                            >
+                              Manage on Oura
+                            </a>
+                          </>
+                        )}
                       </>
                     ) : (
                       <Link href="/" className="text-amber-400 hover:text-amber-300 underline">
-                        Connect device (Garmin or Polar)
+                        Connect device (Garmin, Polar, or Oura)
                       </Link>
                     )}
                   </p>

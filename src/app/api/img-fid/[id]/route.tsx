@@ -278,7 +278,7 @@ export async function GET(
               }}
             >
               {userRow
-                ? `I'm currently #${Number(userRow.rank)} on the $steps leaderboard!`
+                ? `I'm #${Number(userRow.rank)} on the weekly $steps leaderboard!`
                 : "Can you beat me?"}
             </div>
             {userRow && (
@@ -297,7 +297,7 @@ export async function GET(
                     fontWeight: "400",
                   }}
                 >
-                  Current Steps:
+                  Weekly Steps:
                 </span>
                 <span
                   style={{
@@ -337,14 +337,14 @@ export async function GET(
                 flexDirection: "column",
                 alignItems: "center",
                 gap: "4px",
-                color: "#9ca3af",
+                color: "#ffffff",
                 fontSize: "36px",
                 fontFamily: "ProtoMono",
                 fontWeight: "400",
                 textAlign: "center",
               }}
             >
-              <div>Connect your device to track your daily steps</div>
+              <div>Connect your device to track your daily steps and try to beat me!</div>
               <div
                 style={{
                   color: "#6b7280",
@@ -352,7 +352,7 @@ export async function GET(
                   fontFamily: "ProtoMono",
                 }}
               >
-                And try to beat me!
+                One step at a time 👟
               </div>
             </div>
           </div>
