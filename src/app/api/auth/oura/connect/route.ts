@@ -1,45 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import {
-  encodeOuraCookie,
-  getOuraCookieOptions,
-  OURA_OAUTH_COOKIE_NAME,
-} from "@/lib/oura-oauth-cookie";
 
-const OURA_AUTHORIZE_URL = "https://cloud.ouraring.com/oauth/authorize";
-
-/**
- * Oura OAuth 2.0 — Step 1
- * Store fid + random state in a cookie, then redirect to Oura authorization.
- */
 export async function GET(req: NextRequest) {
+  const fid = req.nextUrl.searchParams.get("fid");
+  if (!fid) {
+    return NextResponse.json({ error: "Missing fid" }, { status: 400 });
+  }
+
   const clientId = process.env.OURA_CLIENT_ID;
   const redirectUri =
     process.env.OURA_REDIRECT_URI ||
     `${process.env.NEXT_PUBLIC_URL || "https://app.livmore.life"}/api/auth/oura/callback`;
 
   if (!clientId || !redirectUri) {
-    console.error("[oura connect] Missing OURA_CLIENT_ID or redirect URI");
+    console.error("[oura connect] Missing OURA_CLIENT_ID or OURA_REDIRECT_URI");
     return NextResponse.json(
       { error: "Server misconfiguration" },
       { status: 500 }
     );
   }
 
-  const fidParam = req.nextUrl.searchParams.get("fid");
-  const fid = fidParam ? parseInt(fidParam, 10) : NaN;
-
-  if (!Number.isInteger(fid) || fid < 1) {
-    return NextResponse.json(
-      { error: "fid is required and must be a positive integer" },
-      { status: 400 }
-    );
-  }
-
   const state = crypto.randomBytes(16).toString("hex");
-
-  const payload = encodeOuraCookie({ state, fid });
-  const cookieOptions = getOuraCookieOptions();
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -49,8 +30,26 @@ export async function GET(req: NextRequest) {
     state,
   });
 
-  const redirectToOura = `${OURA_AUTHORIZE_URL}?${params.toString()}`;
-  const res = NextResponse.redirect(redirectToOura, 302);
-  res.cookies.set(OURA_OAUTH_COOKIE_NAME, payload, cookieOptions);
+  const res = NextResponse.redirect(
+    `https://cloud.ouraring.com/oauth/authorize?${params}`,
+    302
+  );
+
+  // Guardar fid + state en cookie para verificar en callback
+  res.cookies.set("oura_oauth_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 10, // 10 minutos
+    path: "/",
+  });
+  res.cookies.set("oura_oauth_fid", fid, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 10,
+    path: "/",
+  });
+
   return res;
 }

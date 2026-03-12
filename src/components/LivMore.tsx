@@ -23,7 +23,7 @@ const EAS_CONTRACT = "0x4200000000000000000000000000000000000021";
 const BASE_RPC = "https://mainnet.base.org";
 
 /** Only these FIDs can see Garmin/Polar connection buttons during the update period */
-const ALLOWED_BETA_FIDS = [20701, 343393, 1020677, 448043, 348971];
+const ALLOWED_BETA_FIDS = [20701, 343393, 1020677, 448043, 348971, 263849];
 
 /** Returns today's date in UTC as YYYY-MM-DD */
 function getTodayUTC(): string {
