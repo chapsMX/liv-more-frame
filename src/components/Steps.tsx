@@ -113,6 +113,7 @@ export default function Steps({
 
   const myEntry = currentUserFid ? general.find((e) => e.fid === currentUserFid) : undefined;
   const appUrl = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, "") ?? "";
+  const canShare = currentUserFid && competition && onShareLeaderboard && appUrl && tab === "current";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -223,15 +224,17 @@ export default function Steps({
             </div>
           )}
 
-          {myEntry && competition && onShareLeaderboard && appUrl && (
+          {canShare && (
             <button
               type="button"
               onClick={async () => {
                 setSharing(true);
                 try {
                   const date = todayYYYYMMDD();
-                  const shareUrl = `${appUrl}/share/leaderboard/fid/${competition.id}-${myEntry.fid}-${date}`;
-                  const shareText = `I'm #${myEntry.rank} on the Weekly Leaderboard with ${formatSteps(myEntry.total_valid_steps)} steps! 👟\n\nTracking healthy habits, one step at a time with @livmore`;
+                  const shareUrl = `${appUrl}/share/leaderboard/fid/${competition!.id}-${currentUserFid!}-${date}`;
+                  const shareText = myEntry
+                    ? `I'm #${myEntry.rank} on the Weekly Leaderboard with ${formatSteps(myEntry.total_valid_steps)} steps! 👟\n\nTracking healthy habits, one step at a time with @livmore`
+                    : `Join me on LivMore! Tracking healthy habits, one step at a time 👟 @livmore`;
                   await onShareLeaderboard(shareUrl, shareText);
                 } catch (e) {
                   console.warn("[Steps] share failed:", e);

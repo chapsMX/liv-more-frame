@@ -101,37 +101,45 @@ export async function GET(
       return new Response("Competition not found", { status: 404 });
     }
 
-    // Fetch user's position in this week
+    // Fetch user's position in this week (rank must be computed over ALL participants, then filter)
     const userRows = await sql`
-      SELECT u.fid, u.username, SUM(ds.steps)::int AS total_valid_steps,
-        RANK() OVER (ORDER BY SUM(ds.steps) DESC) AS rank
-      FROM "2026_daily_steps" ds
-      JOIN "2026_users" u ON u.id = ds.user_id
-      WHERE ds.attestation_hash IS NOT NULL
-        AND ds.date BETWEEN ${competition.week_start}::date AND ${competition.week_end}::date
-        AND u.fid = ${fid}
-      GROUP BY u.id, u.fid, u.username
+      SELECT fid, username, total_valid_steps, rank
+      FROM (
+        SELECT u.fid, u.username, SUM(ds.steps)::int AS total_valid_steps,
+          RANK() OVER (ORDER BY SUM(ds.steps) DESC) AS rank
+        FROM "2026_daily_steps" ds
+        JOIN "2026_users" u ON u.id = ds.user_id
+        WHERE ds.attestation_hash IS NOT NULL
+          AND ds.date BETWEEN ${competition.week_start}::date AND ${competition.week_end}::date
+        GROUP BY u.id, u.fid, u.username
+      ) ranked
+      WHERE fid = ${fid}
     `;
 
     const userRow = userRows[0] as
       | { fid: number; username: string | null; total_valid_steps: number; rank: number }
       | undefined;
 
-    if (!userRow) {
-      return new Response("User not found in this week's leaderboard", { status: 404 });
-    }
-
-    // Fetch pfp URL from Neynar
-    let pfpUrl: string | null = null;
+    // Fetch pfp from Neynar - explicitly match by fid, embed as base64 for reliable rendering
+    let pfpDataUrl: string | null = null;
     try {
       const neynar = new NeynarAPIClient({ apiKey: process.env.NEYNAR_API_KEY || "" });
       const res = await neynar.fetchBulkUsers({ fids: [fid] });
-      pfpUrl = res.users[0]?.pfp_url ?? null;
+      const user = Array.isArray(res.users) ? res.users.find((u: { fid?: number }) => Number(u.fid) === fid) : res.users?.[0];
+      const pfpUrl = user?.pfp_url ?? null;
+      if (pfpUrl) {
+        const pfpRes = await fetch(pfpUrl);
+        if (pfpRes.ok) {
+          const pfpBuf = await pfpRes.arrayBuffer();
+          const mime = pfpRes.headers.get("content-type")?.split(";")[0] || "image/png";
+          pfpDataUrl = `data:${mime};base64,${Buffer.from(pfpBuf).toString("base64")}`;
+        }
+      }
     } catch {
       // Continue without pfp
     }
 
-    // Load background and logo
+    // Load dailyShare (transparent, 30% opacity) and logo
     let bgImage: ArrayBuffer;
     let logoImage: ArrayBuffer;
     try {
@@ -142,176 +150,225 @@ export async function GET(
       return new Response("Failed to load images", { status: 500 });
     }
 
-    // Load font (Node.js fs - skip if unavailable)
-    let fontData: ArrayBuffer | null = null;
-    try {
-      const fontPaths = [
-        path.join(process.cwd(), "public/fonts/ProtoMono-Regular.otf"),
-        path.join(process.cwd(), "fonts/ProtoMono-Regular.otf"),
-      ];
-      for (const fontPath of fontPaths) {
-        if (fs.existsSync(fontPath)) {
-          fontData = fs.readFileSync(fontPath).buffer;
-          break;
-        }
+    // Load font - required for correct rendering (match working example)
+    const fontPaths = [
+      path.join(process.cwd(), "src/styles/fonts/ProtoMono-Regular.otf"),
+      path.join(process.cwd(), "public/fonts/ProtoMono-Regular.otf"),
+      path.join(process.cwd(), "fonts/ProtoMono-Regular.otf"),
+    ];
+    let fontData: Buffer | null = null;
+    for (const fontPath of fontPaths) {
+      if (fs.existsSync(fontPath)) {
+        fontData = fs.readFileSync(fontPath);
+        break;
       }
-    } catch {
-      // Font optional, use monospace
+    }
+    if (!fontData) {
+      console.error("[img-fid] Font not found at any path:", fontPaths);
+      return new Response("Font not found", { status: 500 });
     }
 
-    const fontFamily = fontData ? "ProtoMono" : "monospace";
+    const bgBase64 = Buffer.from(bgImage).toString("base64");
+    const logoBase64 = Buffer.from(logoImage).toString("base64");
 
     return new ImageResponse(
       (
         <div
           style={{
+            height: "100%",
+            width: "100%",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            height: "100%",
-            width: "100%",
+            justifyContent: "space-between",
+            padding: "40px",
             position: "relative",
             backgroundColor: "#101827",
           }}
         >
-          {/* Background */}
-          <img
-            src={`data:image/png;base64,${Buffer.from(bgImage).toString("base64")}`}
-            alt=""
+          {/* dailyShare: transparent, 30% opacity */}
+          <div
             style={{
               position: "absolute",
               top: 0,
               left: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
+              right: 0,
+              bottom: 0,
+              backgroundImage: `url(data:image/png;base64,${bgBase64})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              opacity: 0.3,
             }}
           />
+          {/* LivMore logo watermark (fondo de agua) */}
 
-          {/* Content overlay - Satori requires display:flex on divs with multiple children */}
+          {/* Content (above watermark) */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
-              padding: 48,
+              justifyContent: "space-between",
+              height: "100%",
+              width: "100%",
               position: "relative",
               zIndex: 1,
             }}
           >
-            {/* Profile picture */}
-            {pfpUrl ? (
+          {/* Profile Picture */}
+          <div
+            style={{
+              width: "410px",
+              height: "410px",
+              borderRadius: "70px",
+              border: "4px solid #ff8800",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: "10px",
+            }}
+          >
+            {pfpDataUrl ? (
               <img
-                src={pfpUrl}
-                alt=""
+                src={pfpDataUrl}
+                alt="Profile"
                 style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: "50%",
-                  border: "4px solid #ff8800",
-                  marginBottom: 32,
+                  width: "100%",
+                  height: "100%",
                   objectFit: "cover",
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: "50%",
-                  border: "4px solid #ff8800",
-                  marginBottom: 32,
-                  background: "#374151",
+                  width: "100%",
+                  height: "100%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  backgroundColor: "#374151",
                   color: "#9ca3af",
                   fontSize: 48,
-                  fontFamily: fontFamily,
+                  fontFamily: "ProtoMono",
                 }}
               >
                 ?
               </div>
             )}
+          </div>
 
-            {/* Im currently # on the Weekly Leaderboard */}
+          {/* Leaderboard text */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "10px",
+            }}
+          >
             <div
               style={{
-                display: "flex",
                 color: "white",
-                fontSize: 42,
-                fontFamily: fontFamily,
-                fontWeight: 700,
+                fontSize: "42px",
+                fontFamily: "ProtoMono",
+                fontWeight: "700",
                 textAlign: "center",
-                marginBottom: 16,
               }}
             >
-              I&apos;m currently #{Number(userRow.rank)} on the Weekly Leaderboard
+              {userRow
+                ? `I'm currently #${Number(userRow.rank)} on the $steps leaderboard!`
+                : "Can you beat me?"}
             </div>
+            {userRow && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#ff8800",
+                    fontSize: "36px",
+                    fontFamily: "ProtoMono",
+                    fontWeight: "400",
+                  }}
+                >
+                  Current Steps:
+                </span>
+                <span
+                  style={{
+                    color: "white",
+                    fontSize: "40px",
+                    fontFamily: "ProtoMono",
+                    fontWeight: "400",
+                  }}
+                >
+                  {Number(userRow.total_valid_steps).toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
 
-            {/* Steps */}
-            <div
-              style={{
-                display: "flex",
-                color: "#ff8800",
-                fontSize: 36,
-                fontFamily: fontFamily,
-                marginBottom: 48,
-              }}
-            >
-              Steps: {Number(userRow.total_valid_steps).toLocaleString()}
-            </div>
-
-            {/* LivMore logo */}
+          {/* Logo */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginTop: "auto",
+            }}
+          >
             <img
-              src={`data:image/png;base64,${Buffer.from(logoImage).toString("base64")}`}
+              src={`data:image/png;base64,${logoBase64}`}
               alt="LivMore"
               style={{
-                width: 80,
-                marginBottom: 16,
+                width: "32px",
+                height: "auto",
+                marginBottom: "10px",
               }}
             />
-
-            {/* Taglines */}
             <div
               style={{
                 display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "4px",
                 color: "#9ca3af",
-                fontSize: 20,
-                fontFamily: fontFamily,
-                textAlign: "center",
-                marginBottom: 4,
-              }}
-            >
-              Tracking your healthy habits
-            </div>
-            <div
-              style={{
-                display: "flex",
-                color: "#6b7280",
-                fontSize: 18,
-                fontFamily: fontFamily,
+                fontSize: "36px",
+                fontFamily: "ProtoMono",
+                fontWeight: "400",
                 textAlign: "center",
               }}
             >
-              One step at a time
+              <div>Connect your device to track your daily steps</div>
+              <div
+                style={{
+                  color: "#6b7280",
+                  fontSize: "32px",
+                  fontFamily: "ProtoMono",
+                }}
+              >
+                And try to beat me!
+              </div>
             </div>
+          </div>
           </div>
         </div>
       ),
       {
         ...size,
-        ...(fontData && {
-          fonts: [
-            {
-              name: "ProtoMono",
-              data: fontData,
-              style: "normal",
-            },
-          ],
-        }),
+        fonts: [
+          {
+            name: "ProtoMono",
+            data: fontData as unknown as ArrayBuffer,
+            weight: 400,
+            style: "normal",
+          },
+        ],
       }
     );
   } catch (e) {
