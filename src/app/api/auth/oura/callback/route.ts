@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
+import { getValidOuraConnection } from "@/lib/oura";
 
 const OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token";
 const OURA_PERSONAL_INFO_URL =
@@ -135,6 +137,60 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
+  waitUntil(
+    backfillOuraHistory(userId, ouraUserId).catch((err) => {
+      console.error("[oura/callback] backfill error:", err);
+    })
+  );
+
   res.headers.set("Location", `${appUrl}?oura=success`);
   return res;
+}
+
+async function backfillOuraHistory(userId: number, ouraUserId: string) {
+  const connection = await getValidOuraConnection(ouraUserId);
+  if (!connection) return;
+
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDate = new Date(
+    Date.now() - 10 * 86400000
+  )
+    .toISOString()
+    .split("T")[0];
+
+  const res = await fetch(
+    `https://api.ouraring.com/v2/usercollection/daily_activity?start_date=${startDate}&end_date=${endDate}`,
+    { headers: { Authorization: `Bearer ${connection.access_token}` } }
+  );
+
+  if (!res.ok) {
+    console.error(
+      "[oura/backfill] failed to fetch activity:",
+      await res.text()
+    );
+    return;
+  }
+
+  const json = await res.json();
+  const data = json.data ?? json;
+  const activities = Array.isArray(data) ? data : [];
+
+  let saved = 0;
+
+  for (const activity of activities) {
+    const day = activity.day ?? activity.date ?? activity.timestamp?.split("T")[0];
+    const steps = activity.steps;
+
+    if (!day || steps == null) continue;
+
+    await sql`
+      INSERT INTO "2026_daily_steps" (user_id, date, steps)
+      VALUES (${userId}, ${day}, ${steps})
+      ON CONFLICT (user_id, date) DO UPDATE
+        SET steps = EXCLUDED.steps
+    `;
+    saved++;
+  }
+
+  console.log(`[oura/backfill] saved ${saved} days for user ${userId}`);
 }

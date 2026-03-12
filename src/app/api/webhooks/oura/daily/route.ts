@@ -60,7 +60,10 @@ export async function POST(req: NextRequest) {
 }
 
 async function processDailyActivity(payload: OuraWebhookPayload) {
-  // 1. Buscar conexión activa con token válido (refresca si expirado)
+  console.log(
+    `[webhooks/oura/daily] received ${payload.event_type} for oura_user_id ${payload.user_id}`
+  );
+
   const connection = await getValidOuraConnection(payload.user_id);
   if (!connection) {
     console.warn(
@@ -69,12 +72,18 @@ async function processDailyActivity(payload: OuraWebhookPayload) {
     return;
   }
 
-  // 2. Obtener el documento de Oura por ID (object_id o id)
   const docId = payload.object_id ?? payload.id;
   if (!docId) {
-    console.warn("[webhooks/oura/daily] missing id/object_id in payload:", payload);
+    console.warn(
+      "[webhooks/oura/daily] missing id/object_id in payload:",
+      payload
+    );
     return;
   }
+
+  console.log(
+    `[webhooks/oura/daily] fetching activity ${docId} for user ${connection.user_id}`
+  );
 
   const res = await fetch(
     `https://api.ouraring.com/v2/usercollection/daily_activity/${docId}`,
@@ -90,7 +99,7 @@ async function processDailyActivity(payload: OuraWebhookPayload) {
   }
 
   const activity = await res.json();
-  const { day, steps } = activity; // day = "2026-03-12", steps = integer
+  const { day, steps } = activity;
 
   if (!day || steps == null) {
     console.warn(
@@ -100,15 +109,19 @@ async function processDailyActivity(payload: OuraWebhookPayload) {
     return;
   }
 
-  // 3. Upsert en 2026_daily_steps
-  await sql`
+  // Upsert y detectar si fue insert o update (xmax = 0 en inserts nuevos)
+  const result = await sql`
     INSERT INTO "2026_daily_steps" (user_id, date, steps)
     VALUES (${connection.user_id}, ${day}, ${steps})
     ON CONFLICT (user_id, date) DO UPDATE
       SET steps = EXCLUDED.steps
+    RETURNING id, (xmax = 0) AS inserted
   `;
 
+  const wasInserted = result[0]?.inserted;
+  const action = wasInserted ? "Inserted" : "Updated";
+
   console.log(
-    `[webhooks/oura/daily] saved ${steps} steps for user ${connection.user_id} on ${day}`
+    `[webhooks/oura/daily] ${action} ${steps} steps for user ${connection.user_id} (fid lookup via oura_user_id: ${payload.user_id}) on ${day} — event: ${payload.event_type}`
   );
 }
