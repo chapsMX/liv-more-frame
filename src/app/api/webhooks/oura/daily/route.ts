@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
+import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { getValidOuraConnection } from "@/lib/oura";
 
@@ -27,18 +28,28 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // Validar verification token
-  const token =
-    req.headers.get("x-oura-verification-token") ??
-    req.nextUrl.searchParams.get("verification_token");
-  if (token !== process.env.OURA_VERIFICATION_TOKEN) {
-    console.warn("[webhooks/oura/daily] invalid verification token");
+  const signature = req.headers.get("x-oura-signature");
+  const timestamp = req.headers.get("x-oura-timestamp");
+
+  if (!signature || !timestamp) {
+    console.warn("[webhooks/oura/daily] missing signature headers");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const text = await req.text();
+
+  // Verificar HMAC: SHA256(timestamp + body) con CLIENT_SECRET
+  const hmac = crypto.createHmac("sha256", process.env.OURA_CLIENT_SECRET!);
+  hmac.update(timestamp + text);
+  const calculatedSignature = hmac.digest("hex").toUpperCase();
+
+  if (calculatedSignature !== signature) {
+    console.warn("[webhooks/oura/daily] invalid HMAC signature");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: OuraWebhookPayload;
   try {
-    const text = await req.text();
     if (!text) return NextResponse.json({ ok: true }, { status: 200 });
     body = JSON.parse(text);
   } catch {
