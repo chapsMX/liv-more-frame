@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { sql } from "@/lib/db";
+import { withRetry } from "@/lib/db-retry";
 
 /** Payload sent by Garmin daily summary webhook */
 type GarminDailySummary = {
@@ -52,10 +54,12 @@ export async function POST(req: NextRequest) {
     sampleToken + "..."
   );
 
-  // Respond 200 immediately — Garmin has ~30s timeout and will retry if no 200
-  processDailies(dailies).catch((err) => {
-    console.error("[webhooks/garmin/daily] processDailies error:", err);
-  });
+  // waitUntil: mantiene la función viva hasta que processDailies termine
+  waitUntil(
+    processDailies(dailies).catch((err) => {
+      console.error("[webhooks/garmin/daily] processDailies error:", err);
+    })
+  );
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
@@ -79,28 +83,32 @@ async function processDailies(dailies: GarminDailySummary[]) {
 
   let connRows: ConnRow[];
   try {
-    connRows = (await sql`
-      SELECT
-        gc.access_token,
-        pc.user_id,
-        gc.id AS garmin_connection_id,
-        gc.garmin_user_id
-      FROM "2026_garmin_connections" gc
-      INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
-      WHERE gc.access_token = ANY(${tokens})
-        AND pc.disconnected_at IS NULL
-    `) as ConnRow[];
+    connRows = (await withRetry(() =>
+      sql`
+        SELECT
+          gc.access_token,
+          pc.user_id,
+          gc.id AS garmin_connection_id,
+          gc.garmin_user_id
+        FROM "2026_garmin_connections" gc
+        INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+        WHERE gc.access_token = ANY(${tokens})
+          AND pc.disconnected_at IS NULL
+      `
+    )) as ConnRow[];
   } catch (err) {
     console.error("[webhooks/garmin/daily] Batch connection lookup failed, trying per-token:", err);
     // Fallback: per-token lookup (old behavior)
     connRows = [];
     for (const token of tokens) {
-      const rows = (await sql`
-        SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
-        FROM "2026_garmin_connections" gc
-        INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
-        WHERE gc.access_token = ${token} AND pc.disconnected_at IS NULL
-      `) as ConnRow[];
+      const rows = (await withRetry(() =>
+        sql`
+          SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
+          FROM "2026_garmin_connections" gc
+          INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+          WHERE gc.access_token = ${token} AND pc.disconnected_at IS NULL
+        `
+      )) as ConnRow[];
       connRows.push(...rows);
     }
   }
@@ -129,14 +137,16 @@ async function processDailies(dailies: GarminDailySummary[]) {
     let row = connByToken.get(summary.userAccessToken);
     if (!row && summary.userId) {
       // Fallback: lookup by garmin_user_id (Health API may use different token format)
-      const byGarminUserId = (await sql`
-        SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
-        FROM "2026_garmin_connections" gc
-        INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
-        WHERE gc.garmin_user_id = ${summary.userId}
-          AND pc.disconnected_at IS NULL
-        LIMIT 1
-      `) as ConnRow[];
+      const byGarminUserId = (await withRetry(() =>
+        sql`
+          SELECT gc.access_token, pc.user_id, gc.id AS garmin_connection_id, gc.garmin_user_id
+          FROM "2026_garmin_connections" gc
+          INNER JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
+          WHERE gc.garmin_user_id = ${summary.userId}
+            AND pc.disconnected_at IS NULL
+          LIMIT 1
+        `
+      )) as ConnRow[];
       row = byGarminUserId[0];
       if (row) {
         connByToken.set(summary.userAccessToken, row);
@@ -187,11 +197,13 @@ async function processDailies(dailies: GarminDailySummary[]) {
 
   // 3. Batch backfill garmin_user_id (rare, usually 0-1)
   for (const { id, garminUserId } of backfillUpdates) {
-    await sql`
-      UPDATE "2026_garmin_connections"
-      SET garmin_user_id = ${garminUserId}
-      WHERE id = ${id}
-    `;
+    await withRetry(() =>
+      sql`
+        UPDATE "2026_garmin_connections"
+        SET garmin_user_id = ${garminUserId}
+        WHERE id = ${id}
+      `
+    );
   }
 
   // 4. Upsert steps — try batch first, fallback to individual
@@ -200,25 +212,29 @@ async function processDailies(dailies: GarminDailySummary[]) {
     const dates = toUpsert.map((r) => r.date);
     const stepsArr = toUpsert.map((r) => r.steps);
 
-    await sql`
-      INSERT INTO "2026_daily_steps" (user_id, date, steps)
-      SELECT * FROM UNNEST(
-        ${userIds}::int[],
-        ${dates}::date[],
-        ${stepsArr}::int[]
-      ) AS t(user_id, date, steps)
-      ON CONFLICT (user_id, date) DO UPDATE SET
-        steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
-    `;
+    await withRetry(() =>
+      sql`
+        INSERT INTO "2026_daily_steps" (user_id, date, steps)
+        SELECT * FROM UNNEST(
+          ${userIds}::int[],
+          ${dates}::date[],
+          ${stepsArr}::int[]
+        ) AS t(user_id, date, steps)
+        ON CONFLICT (user_id, date) DO UPDATE SET
+          steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
+      `
+    );
   } catch (batchErr) {
     console.error("[webhooks/garmin/daily] Batch upsert failed, falling back to individual:", batchErr);
     for (const r of toUpsert) {
-      await sql`
-        INSERT INTO "2026_daily_steps" (user_id, date, steps)
-        VALUES (${r.userId}, ${r.date}, ${r.steps})
-        ON CONFLICT (user_id, date) DO UPDATE SET
-          steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
-      `;
+      await withRetry(() =>
+        sql`
+          INSERT INTO "2026_daily_steps" (user_id, date, steps)
+          VALUES (${r.userId}, ${r.date}, ${r.steps})
+          ON CONFLICT (user_id, date) DO UPDATE SET
+            steps = GREATEST(EXCLUDED.steps, "2026_daily_steps".steps)
+        `
+      );
     }
   }
 

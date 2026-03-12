@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { sql } from "@/lib/db";
+import { withRetry } from "@/lib/db-retry";
 
 type DeregistrationItem = {
   userId: string;
@@ -26,9 +28,12 @@ export async function POST(req: NextRequest) {
 
   const list = body.deregistrations ?? [];
 
-  processDeregistrations(list).catch((err) => {
-    console.error("[webhooks/garmin/deregister] error:", err);
-  });
+  // waitUntil: mantiene la función viva hasta que processDeregistrations termine
+  waitUntil(
+    processDeregistrations(list).catch((err) => {
+      console.error("[webhooks/garmin/deregister] error:", err);
+    })
+  );
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
@@ -40,25 +45,29 @@ async function processDeregistrations(deregistrations: DeregistrationItem[]) {
     if (!item.userId) continue;
 
     // Marcar como desconectado en provider_connections
-    const updated = await sql`
-      UPDATE "2026_provider_connections" pc
-      SET disconnected_at = now()
-      FROM "2026_garmin_connections" gc
-      WHERE gc.connection_id = pc.id
-        AND gc.garmin_user_id = ${item.userId}
-        AND pc.disconnected_at IS NULL
-      RETURNING pc.user_id
-    `
+    const updated = await withRetry(() =>
+      sql`
+        UPDATE "2026_provider_connections" pc
+        SET disconnected_at = now()
+        FROM "2026_garmin_connections" gc
+        WHERE gc.connection_id = pc.id
+          AND gc.garmin_user_id = ${item.userId}
+          AND pc.disconnected_at IS NULL
+        RETURNING pc.user_id
+      `
+    );
 
-    if (!updated.length) continue
+    if (!updated.length) continue;
 
-    const userId = updated[0].user_id as number
+    const userId = updated[0].user_id as number;
 
-    await sql`
-      UPDATE "2026_users"
-      SET provider = null, updated_at = now()
-      WHERE id = ${userId}
-    `
+    await withRetry(() =>
+      sql`
+        UPDATE "2026_users"
+        SET provider = null, updated_at = now()
+        WHERE id = ${userId}
+      `
+    );
 
     console.log(`[garmin/deregister] user ${userId} disconnected`)
   }
