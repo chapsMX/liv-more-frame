@@ -6,12 +6,6 @@ import { sql } from "@/lib/db";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export async function GET(req: NextRequest) {
-  // DEBUG TEMPORAL
-  console.log("[google/callback] full URL:", req.nextUrl.toString());
-  console.log("[google/callback] search params:", Object.fromEntries(req.nextUrl.searchParams));
-  console.log("[google/callback] all cookies:", (await cookies()).getAll());
-  // FIN DEBUG
-
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXT_PUBLIC_URL ||
@@ -24,13 +18,20 @@ export async function GET(req: NextRequest) {
   const cookieStore = await cookies();
   const savedState = cookieStore.get("google_oauth_state")?.value;
   const fid = cookieStore.get("google_oauth_fid")?.value;
+  const tz = cookieStore.get("google_oauth_tz")?.value ?? "UTC";
 
   const res = NextResponse.redirect(`${appUrl}?google=error`, 302);
   res.cookies.delete("google_oauth_state");
   res.cookies.delete("google_oauth_fid");
+  res.cookies.delete("google_oauth_tz");
 
   if (error || !code || !state || !fid) {
-    console.error("[google/callback] missing params:", { error, code, state, fid });
+    console.error("[google/callback] missing params:", {
+      error,
+      code,
+      state,
+      fid,
+    });
     return res;
   }
 
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest) {
   const redirectUri =
     process.env.GOOGLE_REDIRECT_URI ||
     `${appUrl}/api/auth/google/callback`;
+
   const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -66,7 +68,10 @@ export async function GET(req: NextRequest) {
   });
 
   if (!tokenRes.ok) {
-    console.error("[google/callback] token exchange failed:", await tokenRes.text());
+    console.error(
+      "[google/callback] token exchange failed:",
+      await tokenRes.text()
+    );
     return res;
   }
 
@@ -83,7 +88,6 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  // Decodificar id_token (JWT) para obtener el sub — no requiere llamada extra
   const payload = JSON.parse(
     Buffer.from(id_token.split(".")[1], "base64url").toString()
   );
@@ -101,7 +105,7 @@ export async function GET(req: NextRequest) {
       INSERT INTO "2026_provider_connections" (user_id, provider)
       VALUES (${userId}, 'google')
       ON CONFLICT (user_id) DO UPDATE SET
-        provider = 'google',
+        provider        = 'google',
         disconnected_at = null
       RETURNING id
     `;
@@ -109,14 +113,15 @@ export async function GET(req: NextRequest) {
 
     await sql`
       INSERT INTO "2026_google_connections"
-        (connection_id, google_user_id, access_token, refresh_token, token_expires_at)
+        (connection_id, google_user_id, access_token, refresh_token, token_expires_at, timezone)
       VALUES
-        (${connectionId}, ${googleUserId}, ${access_token}, ${refresh_token}, ${tokenExpiresAt})
+        (${connectionId}, ${googleUserId}, ${access_token}, ${refresh_token}, ${tokenExpiresAt}, ${tz})
       ON CONFLICT (google_user_id) DO UPDATE SET
-        connection_id = EXCLUDED.connection_id,
-        access_token = EXCLUDED.access_token,
-        refresh_token = EXCLUDED.refresh_token,
-        token_expires_at = EXCLUDED.token_expires_at
+        connection_id    = EXCLUDED.connection_id,
+        access_token     = EXCLUDED.access_token,
+        refresh_token    = EXCLUDED.refresh_token,
+        token_expires_at = EXCLUDED.token_expires_at,
+        timezone         = EXCLUDED.timezone
     `;
 
     await sql`
@@ -126,7 +131,7 @@ export async function GET(req: NextRequest) {
     `;
 
     console.log(
-      `[google/callback] user ${userId} (fid: ${fid}) connected as google_user_id: ${googleUserId}`
+      `[google/callback] user ${userId} (fid: ${fid}) connected as google_user_id: ${googleUserId} tz: ${tz}`
     );
   } catch (err) {
     console.error("[google/callback] DB error:", err);
@@ -134,9 +139,11 @@ export async function GET(req: NextRequest) {
   }
 
   waitUntil(
-    backfillGoogleSteps(userId, googleUserId, access_token).catch((err) => {
-      console.error("[google/callback] backfill error:", err);
-    })
+    backfillGoogleSteps(userId, googleUserId, access_token, tz).catch(
+      (err) => {
+        console.error("[google/callback] backfill error:", err);
+      }
+    )
   );
 
   res.headers.set("Location", `${appUrl}?google=success`);
@@ -146,7 +153,8 @@ export async function GET(req: NextRequest) {
 async function backfillGoogleSteps(
   userId: number,
   _googleUserId: string,
-  accessToken: string
+  accessToken: string,
+  tz: string
 ) {
   const endMs = Date.now();
   const startMs = endMs - 30 * 24 * 60 * 60 * 1000;
@@ -166,7 +174,9 @@ async function backfillGoogleSteps(
               "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps",
           },
         ],
-        bucketByTime: { durationMillis: 86400000 },
+        bucketByTime: {
+          period: { type: "day", value: 1, timeZoneId: tz },
+        },
         startTimeMillis: startMs,
         endTimeMillis: endMs,
       }),
@@ -189,9 +199,11 @@ async function backfillGoogleSteps(
     );
     if (!steps) continue;
 
-    const date = new Date(parseInt(b.startTimeMillis, 10))
-      .toISOString()
-      .split("T")[0];
+    const midMs =
+      (parseInt(b.startTimeMillis, 10) + parseInt(b.endTimeMillis, 10)) / 2;
+    const date = new Date(midMs).toLocaleDateString("en-CA", {
+      timeZone: tz,
+    });
 
     const result = await sql`
       INSERT INTO "2026_daily_steps" (user_id, date, steps)
@@ -203,12 +215,10 @@ async function backfillGoogleSteps(
 
     const action = result[0]?.inserted ? "Inserted" : "Updated";
     console.log(
-      `[google/backfill] ${action} ${steps} steps for user ${userId} on ${date}`
+      `[google/backfill] ${action} ${steps} steps for user ${userId} on ${date} (tz: ${tz})`
     );
     saved++;
   }
 
-  console.log(
-    `[google/backfill] done — ${saved} days saved for user ${userId}`
-  );
+  console.log(`[google/backfill] done — ${saved} days saved for user ${userId}`);
 }

@@ -3,6 +3,8 @@ import crypto from "crypto";
 
 export async function GET(req: NextRequest) {
   const fid = req.nextUrl.searchParams.get("fid");
+  const tz = req.nextUrl.searchParams.get("tz") ?? "UTC";
+
   if (!fid) {
     return NextResponse.json({ error: "Missing fid" }, { status: 400 });
   }
@@ -16,7 +18,9 @@ export async function GET(req: NextRequest) {
     "https://www.googleapis.com/auth/fitness.activity.read";
 
   if (!clientId || !redirectUri) {
-    console.error("[google connect] Missing GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI");
+    console.error(
+      "[google connect] Missing GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI"
+    );
     return NextResponse.json(
       { error: "Server misconfiguration" },
       { status: 500 }
@@ -40,20 +44,17 @@ export async function GET(req: NextRequest) {
     302
   );
 
-  res.cookies.set("google_oauth_state", state, {
+  const cookieOpts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     maxAge: 60 * 10,
     path: "/",
-  });
-  res.cookies.set("google_oauth_fid", fid, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 10,
-    path: "/",
-  });
+  };
+
+  res.cookies.set("google_oauth_state", state, cookieOpts);
+  res.cookies.set("google_oauth_fid", fid, cookieOpts);
+  res.cookies.set("google_oauth_tz", tz, cookieOpts);
 
   return res;
 }

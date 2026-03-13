@@ -70,7 +70,12 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         </button>
         <button
           type="button"
-          onClick={() => openAuthUrl(`/api/auth/google/connect?fid=${user.fid}`)}
+          onClick={() => {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            openAuthUrl(
+              `/api/auth/google/connect?fid=${user.fid}&tz=${encodeURIComponent(tz)}`
+            );
+          }}
           className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#4285f4] text-[#4285f4] hover:bg-[#4285f4] hover:text-white rounded-full min-w-[80px] transition-colors"
         >
           Connect Google Fit

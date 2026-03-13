@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
       gc.access_token,
       gc.refresh_token,
       gc.token_expires_at,
-      gc.google_user_id
+      gc.google_user_id,
+      gc.timezone
     FROM "2026_google_connections" gc
     JOIN "2026_provider_connections" pc ON pc.id = gc.connection_id
     JOIN "2026_users" u ON u.id = pc.user_id
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
   let accessToken = conn.access_token;
+  const tz = conn.timezone ?? "UTC";
   const expiresAt = new Date(conn.token_expires_at);
 
   if (expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
@@ -45,7 +47,10 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tokenRes.ok) {
-      console.error("[google/sync] token refresh failed:", await tokenRes.text());
+      console.error(
+        "[google/sync] token refresh failed:",
+        await tokenRes.text()
+      );
       await sql`
         UPDATE "2026_provider_connections"
         SET disconnected_at = now()
@@ -70,8 +75,9 @@ export async function GET(req: NextRequest) {
     accessToken = access_token;
   }
 
+  // 3 días para cubrir el día actual + margen de timezone
   const endMs = Date.now();
-  const startMs = endMs - 2 * 24 * 60 * 60 * 1000;
+  const startMs = endMs - 3 * 24 * 60 * 60 * 1000;
 
   const res = await fetch(
     "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
@@ -88,7 +94,9 @@ export async function GET(req: NextRequest) {
               "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps",
           },
         ],
-        bucketByTime: { durationMillis: 86400000 },
+        bucketByTime: {
+          period: { type: "day", value: 1, timeZoneId: tz },
+        },
         startTimeMillis: startMs,
         endTimeMillis: endMs,
       }),
@@ -114,9 +122,11 @@ export async function GET(req: NextRequest) {
     );
     if (!steps) continue;
 
-    const date = new Date(parseInt(b.startTimeMillis, 10))
-      .toISOString()
-      .split("T")[0];
+    const midMs =
+      (parseInt(b.startTimeMillis, 10) + parseInt(b.endTimeMillis, 10)) / 2;
+    const date = new Date(midMs).toLocaleDateString("en-CA", {
+      timeZone: tz,
+    });
 
     const result = await sql`
       INSERT INTO "2026_daily_steps" (user_id, date, steps)
@@ -128,7 +138,7 @@ export async function GET(req: NextRequest) {
 
     const action = result[0]?.inserted ? "Inserted" : "Updated";
     console.log(
-      `[google/sync] ${action} ${steps} steps for user ${conn.user_id} on ${date}`
+      `[google/sync] ${action} ${steps} steps for user ${conn.user_id} on ${date} (tz: ${tz})`
     );
     synced++;
   }
