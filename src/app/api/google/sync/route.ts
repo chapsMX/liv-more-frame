@@ -108,8 +108,7 @@ export async function GET(req: NextRequest) {
 
   for (const b of bucket ?? []) {
     const steps = (b.dataset?.[0]?.point ?? []).reduce(
-      (sum: number, point: { value?: { intVal?: number }[] }) =>
-        sum + (point.value?.[0]?.intVal ?? 0),
+      (sum: number, point: any) => sum + (point.value?.[0]?.intVal ?? 0),
       0
     );
     if (!steps) continue;
@@ -118,15 +117,23 @@ export async function GET(req: NextRequest) {
       .toISOString()
       .split("T")[0];
 
-    await sql`
+    const result = await sql`
       INSERT INTO "2026_daily_steps" (user_id, date, steps)
       VALUES (${conn.user_id}, ${date}, ${steps})
       ON CONFLICT (user_id, date) DO UPDATE
         SET steps = EXCLUDED.steps
+      RETURNING id, (xmax = 0) AS inserted
     `;
+
+    const action = result[0]?.inserted ? "Inserted" : "Updated";
+    console.log(
+      `[google/sync] ${action} ${steps} steps for user ${conn.user_id} on ${date}`
+    );
     synced++;
   }
 
-  console.log(`[google/sync] synced ${synced} days for user ${conn.user_id}`);
+  console.log(
+    `[google/sync] done — ${synced} days synced for user ${conn.user_id}`
+  );
   return NextResponse.json({ ok: true, synced });
 }

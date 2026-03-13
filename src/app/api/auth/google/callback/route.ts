@@ -183,8 +183,7 @@ async function backfillGoogleSteps(
 
   for (const b of bucket ?? []) {
     const steps = (b.dataset?.[0]?.point ?? []).reduce(
-      (sum: number, point: { value?: { intVal?: number }[] }) =>
-        sum + (point.value?.[0]?.intVal ?? 0),
+      (sum: number, point: any) => sum + (point.value?.[0]?.intVal ?? 0),
       0
     );
     if (!steps) continue;
@@ -193,14 +192,22 @@ async function backfillGoogleSteps(
       .toISOString()
       .split("T")[0];
 
-    await sql`
+    const result = await sql`
       INSERT INTO "2026_daily_steps" (user_id, date, steps)
       VALUES (${userId}, ${date}, ${steps})
       ON CONFLICT (user_id, date) DO UPDATE
         SET steps = EXCLUDED.steps
+      RETURNING id, (xmax = 0) AS inserted
     `;
+
+    const action = result[0]?.inserted ? "Inserted" : "Updated";
+    console.log(
+      `[google/backfill] ${action} ${steps} steps for user ${userId} on ${date}`
+    );
     saved++;
   }
 
-  console.log(`[google/backfill] saved ${saved} days for user ${userId}`);
+  console.log(
+    `[google/backfill] done — ${saved} days saved for user ${userId}`
+  );
 }
