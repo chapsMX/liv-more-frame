@@ -17,7 +17,7 @@ type NeynarUser = {
 };
 
 /** Provider from 2026_users (device connection) */
-type DeviceProvider = "garmin" | "polar" | "oura" | null;
+type DeviceProvider = "garmin" | "polar" | "oura" | "google" | null;
 
 export default function ControlPanel() {
   const [context, setContext] = useState<Context.MiniAppContext | null>(null);
@@ -305,10 +305,23 @@ export default function ControlPanel() {
                             </a>
                           </>
                         )}
+                        {deviceProvider === "google" && (
+                          <>
+                            <span className="text-gray-600">·</span>
+                            <a
+                              href="https://myaccount.google.com/connections/fitness"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-400 hover:text-amber-300 underline"
+                            >
+                              Manage on Google
+                            </a>
+                          </>
+                        )}
                       </>
                     ) : (
                       <Link href="/" className="text-amber-400 hover:text-amber-300 underline">
-                        Connect device (Garmin, Polar, or Oura)
+                        Connect device (Garmin, Polar, Oura, or Google Fit)
                       </Link>
                     )}
                   </p>

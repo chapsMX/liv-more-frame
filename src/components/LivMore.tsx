@@ -22,9 +22,6 @@ type TabId = "home" | "leaderboard" | "steps" | "og";
 const EAS_CONTRACT = "0x4200000000000000000000000000000000000021";
 const BASE_RPC = "https://mainnet.base.org";
 
-/** Only these FIDs can see Garmin/Polar connection buttons during the update period */
-const ALLOWED_BETA_FIDS = [20701, 343393, 1020677, 448043, 348971, 263849];
-
 /** Returns today's date in UTC as YYYY-MM-DD */
 function getTodayUTC(): string {
   return new Date().toISOString().slice(0, 10);
@@ -62,7 +59,7 @@ function formatSteps(n: number | string): string {
 
 /** User has a device connected (from 2026_users.provider) */
 function hasDevice(provider: AppUser["provider"] | undefined): boolean {
-  return provider === "garmin" || provider === "polar" || provider === "oura";
+  return provider === "garmin" || provider === "polar" || provider === "oura" || provider === "google";
 }
 
 /** User has no device (null or undefined) */
@@ -329,16 +326,24 @@ Tracking healthy habits, one step at a time 👟`;
   useEffect(() => {
     if (!sdkReady || !context?.user?.fid) return;
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected" || params?.get("oura") === "success") {
+    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected" || params?.get("oura") === "success" || params?.get("google") === "success") {
       refetchUser();
       // Clean URL without full reload
       const url = new URL(window.location.href);
       url.searchParams.delete("garmin");
       url.searchParams.delete("polar");
       url.searchParams.delete("oura");
+      url.searchParams.delete("google");
       window.history.replaceState({}, "", url.pathname + (url.search || ""));
     }
   }, [sdkReady, context?.user?.fid, refetchUser]);
+
+  // Sync Google Fit steps when user opens app with provider=google
+  useEffect(() => {
+    if (appUser?.provider === "google" && appUser?.fid) {
+      fetch(`/api/google/sync?fid=${appUser.fid}`);
+    }
+  }, [appUser?.provider, appUser?.fid]);
 
   // Fetch last 10 days of steps (yesterday back) when user has a device (Garmin/Polar)
   useEffect(() => {
@@ -603,32 +608,9 @@ Tracking healthy habits, one step at a time 👟`;
           )}
         </main>
       ) : activeTab === "home" && appUser && hasNoDevice(appUser.provider) ? (
-        ALLOWED_BETA_FIDS.includes(appUser.fid) ? (
-          <div className="flex-1 flex flex-col pt-14 pb-16 overflow-auto">
-            <ConnectDevice user={appUser} onProviderSet={refetchUser} />
-          </div>
-        ) : (
-          <main className="flex-1 flex flex-col items-center justify-center p-2 pt-8 pb-16 gap-2 overflow-auto">
-            <div className="flex flex-row items-center justify-center w-full max-w-sm gap-2">
-              <div className="flex flex-1 items-center justify-center">
-                <Image src="/livMore_w.png" alt="Liv More" width={80} height={80} priority />
-              </div>
-              <div className="flex flex-1 items-center justify-center">
-                <h1 className={`text-3xl font-bold ${protoMono.className}`}>LivMore</h1>
-              </div>
-            </div>
-            <p className={`text-gray-400 text-center text-base max-w-sm mt-2 ${protoMono.className}`}>
-              We&apos;re improving the app and getting ready to launch LivMore ASAP
-            </p>
-            <p className={`text-gray-500 text-center text-sm max-w-sm ${protoMono.className}`}>
-              Stay tuned, add the miniapp and turn notifications on to get updates!
-            </p>
-            <section className={`w-full max-w-sm mt-2 p-2 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
-              <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
-              <p className="text-sm text-gray-400">Supported devices: Garmin ✅, Polar ✅, Google Fit 🚧</p>
-            </section>
-          </main>
-        )
+        <div className="flex-1 flex flex-col pt-14 pb-16 overflow-auto">
+          <ConnectDevice user={appUser} onProviderSet={refetchUser} />
+        </div>
       ) : activeTab === "home" && context?.user?.fid && !userLoadDone ? (
         <main className="flex-1 flex flex-col items-center justify-center p-2 pt-14 pb-16 gap-2 overflow-auto">
           <div className="w-8 h-8 border-t-2 border-white rounded-full animate-spin" />

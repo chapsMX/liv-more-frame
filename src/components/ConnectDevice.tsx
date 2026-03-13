@@ -68,6 +68,13 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         >
           Connect Oura
         </button>
+        <button
+          type="button"
+          onClick={() => openAuthUrl(`/api/auth/google/connect?fid=${user.fid}`)}
+          className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#4285f4] text-[#4285f4] hover:bg-[#4285f4] hover:text-white rounded-full min-w-[80px] transition-colors"
+        >
+          Connect Google Fit
+        </button>
         <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
           Both connections open in your browser. Once connected, close the browser window, return to the miniapp and refresh it.
         </p>

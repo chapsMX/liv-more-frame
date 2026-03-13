@@ -183,7 +183,7 @@ export default function Leaderboard() {
 
   return (
     <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
-      <h1 className="text-xl text-center font-semibold text-white mb-4">Farcaster Leaderboard</h1>
+      <h1 className="text-xl text-center font-semibold text-white mb-4">Farcaster Monthly Leaderboard</h1>
 
       {/* Tabs */}
       <div className="flex border-b border-gray-700 mb-4">
