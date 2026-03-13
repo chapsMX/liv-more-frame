@@ -156,8 +156,15 @@ async function backfillGoogleSteps(
   accessToken: string,
   tz: string
 ) {
-  const endMs = Date.now();
-  const startMs = endMs - 30 * 24 * 60 * 60 * 1000;
+  // Obtener fecha de hace 30 días y hoy en formato YYYY-MM-DD
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  const thirtyDaysAgo = new Date(
+    Date.now() - 30 * 24 * 60 * 60 * 1000
+  ).toLocaleDateString("en-CA", { timeZone: tz });
+
+  // Convertir fechas calendario a milisegundos para la API
+  const startMs = new Date(`${thirtyDaysAgo}T00:00:00`).getTime();
+  const endMs = new Date(`${today}T23:59:59`).getTime();
 
   const res = await fetch(
     "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
@@ -199,11 +206,11 @@ async function backfillGoogleSteps(
     );
     if (!steps) continue;
 
-    const midMs =
-      (parseInt(b.startTimeMillis, 10) + parseInt(b.endTimeMillis, 10)) / 2;
-    const date = new Date(midMs).toLocaleDateString("en-CA", {
-      timeZone: tz,
-    });
+    // Con period+day el startTimeMillis de cada bucket ES medianoche del día local
+    const date = new Date(parseInt(b.startTimeMillis, 10)).toLocaleDateString(
+      "en-CA",
+      { timeZone: tz }
+    );
 
     const result = await sql`
       INSERT INTO "2026_daily_steps" (user_id, date, steps)
@@ -215,7 +222,7 @@ async function backfillGoogleSteps(
 
     const action = result[0]?.inserted ? "Inserted" : "Updated";
     console.log(
-      `[google/backfill] ${action} ${steps} steps for user ${userId} on ${date} (tz: ${tz})`
+      `[google/backfill] ${action} ${steps} steps for user ${userId} on ${date}`
     );
     saved++;
   }
