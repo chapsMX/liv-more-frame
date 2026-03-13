@@ -183,7 +183,8 @@ async function backfillGoogleSteps(
 
   for (const b of bucket ?? []) {
     const steps = (b.dataset?.[0]?.point ?? []).reduce(
-      (sum: number, point: any) => sum + (point.value?.[0]?.intVal ?? 0),
+      (sum: number, point: { value?: { intVal?: number }[] }) =>
+        sum + (point.value?.[0]?.intVal ?? 0),
       0
     );
     if (!steps) continue;
