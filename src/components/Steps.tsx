@@ -77,7 +77,7 @@ function LeaderboardRow({
       <div className="flex-1 min-w-0">
         <p className="text-white font-medium truncate">
           {displayNameMap[entry.fid] ?? entry.username ?? `fid:${entry.fid}`}
-          {entry.og && <span className="ml-1 text-amber-400" title="OG">★</span>}
+          {entry.og && <span className="ml-1 text-amber-400" title="OG">◆</span>}
         </p>
         <p className="text-gray-400 text-sm truncate">@{entry.username || `fid:${entry.fid}`}</p>
       </div>

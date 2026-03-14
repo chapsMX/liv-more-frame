@@ -203,11 +203,9 @@ export default function LivMore() {
       const easLink = `https://base.easscan.org/attestation/view/${attestationUID}`;
       const stepsNum = steps ?? 0;
       const dateFormatted = formatDateDayWeekMonth(date);
-      const shareText = `Check this attestation on @base by @livmore
-Obtained: ${dateFormatted}
-Steps: ${stepsNum.toLocaleString()}
-
-Tracking healthy habits, one step at a time 👟`;
+      const shareText = `💎 Onchain proof of ${stepsNum.toLocaleString()} steps on ${dateFormatted}
+         Attested on @base by @livmore, powered by EAS
+         Tracking healthy habits, one step at a time 👟`;
       try {
         await sdk.actions.composeCast({ text: shareText, embeds: [easLink] });
       } catch (shareErr) {
@@ -667,7 +665,8 @@ Tracking healthy habits, one step at a time 👟`;
             className={`py-3 text-center transition-colors ${activeTab === "home" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
             title="Home"
           >
-            🏠
+            🏠<br />
+            HOME
           </button>
           <button
             type="button"
@@ -675,7 +674,8 @@ Tracking healthy habits, one step at a time 👟`;
             className={`py-3 text-center transition-colors ${activeTab === "leaderboard" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
             title="Leaderboard"
           >
-            📊
+            📈<br />
+            RANK
           </button>
           <button
             type="button"
@@ -683,7 +683,8 @@ Tracking healthy habits, one step at a time 👟`;
             className={`py-3 text-center transition-colors ${activeTab === "steps" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
             title="Steps"
           >
-            👟
+            👟<br />
+            $STEPS
           </button>
           <button
             type="button"
@@ -691,7 +692,8 @@ Tracking healthy habits, one step at a time 👟`;
             className={`py-3 text-center transition-colors ${activeTab === "og" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
             title="OG"
           >
-            ✨
+            💎<br />
+            OG
           </button>
         </div>
       </nav>

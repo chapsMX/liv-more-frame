@@ -23,6 +23,17 @@ type AllTimeRow = {
   username: string | null;
 };
 
+type FeedRow = {
+  id: number;
+  user_id: number;
+  fid: number;
+  username: string | null;
+  og: boolean;
+  date: string;
+  steps: number;
+  attested: boolean;
+};
+
 type NeynarUser = {
   fid: number;
   username?: string;
@@ -85,7 +96,9 @@ export default function Leaderboard() {
   const [displayNameMap, setDisplayNameMap] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [allTimeLoading, setAllTimeLoading] = useState(true);
-  const [tab, setTab] = useState<"monthly" | "alltime">("monthly");
+  const [feedData, setFeedData] = useState<FeedRow[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [tab, setTab] = useState<"monthly" | "alltime" | "feed">("monthly");
 
   const { year, month } = (() => {
     const m = availableMonths.find((a) => `${a.year}-${a.month}` === selectedKey);
@@ -140,6 +153,20 @@ export default function Leaderboard() {
     }
   }, []);
 
+  const fetchFeed = useCallback(async () => {
+    setFeedLoading(true);
+    try {
+      const res = await fetch("/api/leaderboard/feed?limit=200");
+      const data = await res.json();
+      setFeedData(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("[Leaderboard] feed fetch error:", e);
+      setFeedData([]);
+    } finally {
+      setFeedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAvailableMonths();
   }, []);
@@ -153,12 +180,17 @@ export default function Leaderboard() {
   }, [fetchAllTime]);
 
   useEffect(() => {
-    if (monthlyData.length === 0) {
+    if (tab === "feed") fetchFeed();
+  }, [tab, fetchFeed]);
+
+  useEffect(() => {
+    const dataToUse = tab === "feed" ? feedData : monthlyData;
+    if (dataToUse.length === 0) {
       setPfpMap({});
       setDisplayNameMap({});
       return;
     }
-    const fids = monthlyData.map((r) => String(r.fid)).join(",");
+    const fids = dataToUse.map((r) => String(r.fid)).join(",");
     fetch(`/api/neynar?fids=${fids}`)
       .then((res) => res.json())
       .then((data) => {
@@ -173,7 +205,7 @@ export default function Leaderboard() {
         setDisplayNameMap(display);
       })
       .catch((e) => console.error("[Leaderboard] neynar fetch error:", e));
-  }, [monthlyData]);
+  }, [monthlyData, feedData, tab]);
 
   const allTimeByType = {
     daily: allTimeData.find((r) => r.record_type === "daily"),
@@ -196,7 +228,20 @@ export default function Leaderboard() {
               : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
           }`}
         >
-          Monthly
+          Monthly Feed<br />
+          Attested
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("feed")}
+          className={`flex-1 py-3 text-sm uppercase tracking-wider transition-colors ${
+            tab === "feed"
+              ? "text-white border-b-2 border-[#ff8800]"
+              : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
+          }`}
+        >
+          Monthly Feed<br />
+          Unattested
         </button>
         <button
           type="button"
@@ -207,7 +252,8 @@ export default function Leaderboard() {
               : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
           }`}
         >
-          All-Time
+          All-Time<br />
+          Records!
         </button>
       </div>
 
@@ -265,12 +311,63 @@ export default function Leaderboard() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium truncate">
                       {displayNameMap[row.fid] ?? row.username ?? `fid:${row.fid}`}
-                      {row.og && <span className="ml-1 text-amber-400" title="OG">★</span>}
+                      {row.og && <span className="ml-1 text-amber-400" title="OG">◆</span>}
                     </p>
                     <p className="text-gray-400 text-sm truncate">@{row.username ?? `fid:${row.fid}`}</p>
                   </div>
                   <span className="text-white font-bold text-lg shrink-0">
                     {formatSteps(row.total_steps)} 👟
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Feed tab */}
+      {tab === "feed" && (
+        <section className="w-full max-w-sm mx-auto">
+          {feedLoading ? (
+            <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
+          ) : feedData.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-8">No activity yet.</p>
+          ) : (
+            <div className="space-y-0.5">
+              {feedData.map((row) => (
+                <div
+                  key={`${row.user_id}-${row.date}`}
+                  className={`flex items-center gap-3 py-1.5 px-2 rounded bg-gray-900/50 border border-gray-800 ${protoMono.className}`}
+                >
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 shrink-0">
+                    {pfpMap[row.fid] ? (
+                      <img
+                        src={pfpMap[row.fid]}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        width={40}
+                        height={40}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                        ?
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">
+                      {displayNameMap[row.fid] ?? row.username ?? `fid:${row.fid}`}
+                      {row.og && <span className="ml-1 text-amber-400" title="OG">◆</span>}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {formatDate(row.date)}
+                      {row.attested && (
+                        <span className="ml-1 text-emerald-400" title="Attested">✓</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="text-white font-bold text-lg shrink-0">
+                    {formatSteps(row.steps)} 👟
                   </span>
                 </div>
               ))}
