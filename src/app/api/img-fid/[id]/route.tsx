@@ -17,14 +17,17 @@ const size = {
 /**
  * GET /api/img-fid/[id]
  * Generates dynamic OG image for user's weekly position share.
- * id formats (date = YYYYMMDD for cache busting):
+ * id formats (date = YYYYMMDD or YYYYMMDDHHMMSS for cache busting):
  *   - "competitionId-fid-date" (e.g. "1-20701-20250307")
  *   - "week_number-fid-date" (e.g. "11-20701-20250307")
  *   - "year-week_number-fid-date" (e.g. "2026-11-20701-20250307")
  *   - "competitionId-fid" or "week_number-fid" (no date, legacy)
  */
 function isDatePart(s: string): boolean {
-  return /^\d{8}$/.test(s) && parseInt(s.slice(4, 6), 10) >= 1 && parseInt(s.slice(4, 6), 10) <= 12;
+  if (/^\d{8}$/.test(s) || /^\d{14}$/.test(s)) {
+    return parseInt(s.slice(4, 6), 10) >= 1 && parseInt(s.slice(4, 6), 10) <= 12;
+  }
+  return false;
 }
 
 export async function GET(

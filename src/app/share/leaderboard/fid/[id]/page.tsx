@@ -3,13 +3,19 @@ import { Metadata } from "next";
 
 const appUrl = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, "") ?? "";
 
-function todayYYYYMMDD(): string {
+function todayYYYYMMDDHHMMSS(): string {
   const d = new Date();
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
 }
 
 function isDatePart(s: string): boolean {
-  return /^\d{8}$/.test(s) && parseInt(s.slice(4, 6), 10) >= 1 && parseInt(s.slice(4, 6), 10) <= 12;
+  if (/^\d{8}$/.test(s)) {
+    return parseInt(s.slice(4, 6), 10) >= 1 && parseInt(s.slice(4, 6), 10) <= 12;
+  }
+  if (/^\d{14}$/.test(s)) {
+    return parseInt(s.slice(4, 6), 10) >= 1 && parseInt(s.slice(4, 6), 10) <= 12;
+  }
+  return false;
 }
 
 export async function generateMetadata({
@@ -29,7 +35,7 @@ export async function generateMetadata({
     ? parts[parts.length - 1]
     : d && /^\d{4}-\d{2}-\d{2}$/.test(d)
       ? d.replace(/-/g, "")
-      : todayYYYYMMDD();
+      : todayYYYYMMDDHHMMSS();
   const imageId = hasDate ? id : `${id}-${dateParam}`;
   const imageUrl = `${appUrl}/api/img-fid/${imageId}`;
 

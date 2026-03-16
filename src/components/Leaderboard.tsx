@@ -240,7 +240,7 @@ export default function Leaderboard() {
               : "text-gray-500 border-b-2 border-transparent hover:text-gray-300"
           }`}
         >
-          Monthly Feed<br />
+          Daily Feed<br />
           Unattested
         </button>
         <button

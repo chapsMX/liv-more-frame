@@ -89,9 +89,9 @@ function LeaderboardRow({
   );
 }
 
-function todayYYYYMMDD(): string {
+function todayYYYYMMDDHHMMSS(): string {
   const d = new Date();
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
 }
 
 export default function Steps({
@@ -230,11 +230,11 @@ export default function Steps({
               onClick={async () => {
                 setSharing(true);
                 try {
-                  const date = todayYYYYMMDD();
+                  const date = todayYYYYMMDDHHMMSS();
                   const shareUrl = `${appUrl}/share/leaderboard/fid/${competition!.id}-${currentUserFid!}-${date}`;
                   const shareText = myEntry
-                    ? `I'm #${myEntry.rank} on the Weekly Leaderboard with ${formatSteps(myEntry.total_valid_steps)} steps! 👟\n\nTracking healthy habits, one step at a time with @livmore`
-                    : `Join me on LivMore! Tracking healthy habits, one step at a time 👟 @livmore`;
+                    ? `I'm #${myEntry.rank} on @livmore's Weekly Leaderboard with ${formatSteps(myEntry.total_valid_steps)} valid steps 👟\n@livmore rewards your steps with $STEPS token every week 👟\n\nTop 5 walkers split 60% of the weekly prize pool — 12% each.\n\nConnect your device, attest your steps and join the challenge 👇`
+                    : `Steps Leaderboard\n@livmore rewards your steps with $STEPS token every week 👟\n\nTop 5 walkers split 60% of the weekly prize pool — 12% each.\n\nConnect your device, attest your steps and join the challenge 👇`;
                   await onShareLeaderboard(shareUrl, shareText);
                 } catch (e) {
                   console.warn("[Steps] share failed:", e);

@@ -204,8 +204,8 @@ export default function LivMore() {
       const stepsNum = steps ?? 0;
       const dateFormatted = formatDateDayWeekMonth(date);
       const shareText = `💎 Onchain proof of ${stepsNum.toLocaleString()} steps on ${dateFormatted}
-         Attested on @base by @livmore, powered by EAS
-         Tracking healthy habits, one step at a time 👟`;
+Attested on @base.base.eth by @livmore, powered by EAS
+Tracking healthy habits, one step at a time 👟`;
       try {
         await sdk.actions.composeCast({ text: shareText, embeds: [easLink] });
       } catch (shareErr) {
