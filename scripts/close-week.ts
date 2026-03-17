@@ -16,33 +16,17 @@
  *   --year 2026
  */
 
+import 'dotenv/config'
 import { neon } from '@neondatabase/serverless'
-import { createPublicClient, http } from 'viem'
-import { base } from 'viem/chains'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const DATABASE_URL   = process.env.DATABASE_URL!
-const NFT_CONTRACT   = '0x73590BCC99a8E334454C08858da91d1e869558B9' as `0x${string}`
-const BASE_RPC       = 'https://mainnet.base.org'
+const DATABASE_URL    = process.env.DATABASE_URL!
 
-// Distribución de premios
-const GENERAL_TOP_N          = 5
-const GENERAL_POOL_PCT        = 0.60
-const NFT_HOLDER_POOL_PCT     = 0.20
-const OG_POOL_PCT             = 0.20
-const GENERAL_EACH_PCT        = GENERAL_POOL_PCT / GENERAL_TOP_N  // 0.12
-
-// ERC721 ABI mínimo para ownerOf
-const ERC721_ABI = [
-  {
-    name: 'ownerOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs:  [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [{ name: '',        type: 'address'  }],
-  },
-] as const
+const GENERAL_TOP_N   = 5
+const GENERAL_POOL_PCT = 0.60
+const OG_POOL_PCT      = 0.20
+const GENERAL_EACH_PCT = GENERAL_POOL_PCT / GENERAL_TOP_N  // 0.12
 
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +55,6 @@ async function main() {
     `
     competition = rows[0]
   } else {
-    // La más reciente en estado 'active'
     const rows = await sql`
       SELECT * FROM "2026_weekly_competitions"
       WHERE status = 'active'
@@ -89,7 +72,7 @@ async function main() {
   console.log(`\n📅 Closing Week ${competition.week_number} · ${competition.year}`)
   console.log(`   ${competition.week_start} → ${competition.week_end}`)
 
-  // 2. Calcular ganadores generales (top 5 pasos atestados)
+  // 2. Calcular top 5 general
   const generalRows = await sql`
     SELECT
       u.id        AS user_id,
@@ -114,77 +97,23 @@ async function main() {
     console.log('   (none)')
   } else {
     for (const r of generalRows) {
-      console.log(`   #${r.rank} ${r.username} — ${r.total_valid_steps.toLocaleString()} steps`)
+      const ogBadge = r.og ? ' 💎 OG' : ''
+      console.log(`   #${r.rank} ${r.username}${ogBadge} — ${r.total_valid_steps.toLocaleString()} steps`)
     }
   }
 
-  // 3. Calcular ganador NFT holder
-  // Obtener todos los usuarios con eth_address y sus pasos atestados
-  const allParticipants = await sql`
-    SELECT
-      u.id        AS user_id,
-      u.fid,
-      u.username,
-      u.og,
-      u.eth_address,
-      SUM(ds.steps)::int AS total_valid_steps
-    FROM "2026_daily_steps" ds
-    JOIN "2026_users" u ON u.id = ds.user_id
-    WHERE
-      ds.date BETWEEN ${competition.week_start}::date AND ${competition.week_end}::date
-      AND ds.attestation_hash IS NOT NULL
-      AND u.eth_address IS NOT NULL
-    GROUP BY u.id, u.fid, u.username, u.og, u.eth_address
-    ORDER BY total_valid_steps DESC
-  `
-
-  // Verificar on-chain quién tiene el NFT
-  const viemClient = createPublicClient({
-    chain:     base,
-    transport: http(BASE_RPC),
-  })
-
-  let nftWinner: typeof allParticipants[0] | null = null
-  console.log('\n🎭 Checking NFT holders on-chain...')
-
-  for (const participant of allParticipants) {
-    // El tokenId del NFT = fid del minter original
-    // Verificamos si el participante actualmente posee su token o cualquier otro
-    // que pertenezca a alguien con fid registrado
-    try {
-      // Buscar todos los fids registrados para verificar si este usuario tiene alguno
-      const fidsRow = await sql`
-        SELECT fid FROM "2026_users" WHERE eth_address IS NOT NULL
-      `
-      for (const fidRow of fidsRow) {
-        const tokenId = BigInt(fidRow.fid)
-        try {
-          const owner = await viemClient.readContract({
-            address:      NFT_CONTRACT,
-            abi:          ERC721_ABI,
-            functionName: 'ownerOf',
-            args:         [tokenId],
-          })
-          if (owner.toLowerCase() === participant.eth_address.toLowerCase()) {
-            nftWinner = participant
-            console.log(`   ✅ NFT holder: ${participant.username} (tokenId ${tokenId})`)
-            break
-          }
-        } catch {
-          // Token no minteado o quemado, continuar
-        }
-      }
-      if (nftWinner) break
-    } catch {
-      continue
+  // 3. Verificar si hay OG entre los ganadores del top 5
+  const ogWinnersInTop5 = generalRows.filter(r => r.og)
+  console.log('\n⭐ OG in Top 5:')
+  if (ogWinnersInTop5.length > 0) {
+    for (const w of ogWinnersInTop5) {
+      console.log(`   💎 ${w.username} — #${w.rank} with ${w.total_valid_steps.toLocaleString()} steps`)
     }
+  } else {
+    console.log('   ⚠️  No OG in top 5 this week')
   }
 
-  if (!nftWinner) {
-    console.log('   ⚠️  No NFT holder found — prize accumulates')
-  }
-
-  // 4. Calcular ganador OG
+  // 4. Calcular ganador OG (el de más pasos con og=true, aunque no esté en top 5)
   const ogRows = await sql`
     SELECT
       u.id        AS user_id,
@@ -205,25 +134,22 @@ async function main() {
   `
   const ogWinner = ogRows[0] ?? null
 
-  console.log('\n⭐ OG Winner:')
-  if (ogWinner) {
-    console.log(`   ${ogWinner.username} — ${ogWinner.total_valid_steps.toLocaleString()} steps`)
-  } else {
-    console.log('   ⚠️  No OG found — prize accumulates')
+  if (ogWinner && !ogWinnersInTop5.find(w => w.user_id === ogWinner.user_id)) {
+    console.log(`\n   ℹ️  OG category winner (outside top 5): ${ogWinner.username} — ${ogWinner.total_valid_steps.toLocaleString()} steps`)
   }
 
   // 5. Resumen de premios
   const pool = Number(competition.pool_amount ?? 0) + Number(competition.accumulated ?? 0)
   console.log(`\n💰 Pool: ${pool.toLocaleString()} $STEPS`)
   console.log(`   General (60%): ${(pool * GENERAL_POOL_PCT).toFixed(2)} ÷ ${GENERAL_TOP_N} = ${(pool * GENERAL_EACH_PCT).toFixed(2)} each`)
-  console.log(`   NFT Holder (20%): ${(pool * NFT_HOLDER_POOL_PCT).toFixed(2)}`)
-  console.log(`   OG (20%): ${(pool * OG_POOL_PCT).toFixed(2)}`)
+  console.log(`   OG (20%): ${ogWinner ? `${(pool * OG_POOL_PCT).toFixed(2)} → ${ogWinner.username}` : '⚠️  accumulates'}`)
+  console.log(`   NFT Holder (20%): pending manual check`)
 
   // 6. Calcular siguiente semana
-  const currentEnd   = new Date(competition.week_end)
-  const nextStart    = new Date(currentEnd)
+  const currentEnd  = new Date(competition.week_end)
+  const nextStart   = new Date(currentEnd)
   nextStart.setSeconds(nextStart.getSeconds() + 1)
-  const nextEnd      = new Date(nextStart)
+  const nextEnd     = new Date(nextStart)
   nextEnd.setDate(nextEnd.getDate() + 6)
   nextEnd.setHours(17, 59, 59, 0)
 
@@ -261,24 +187,6 @@ async function main() {
     `
   }
 
-  // Insertar ganador NFT holder
-  if (nftWinner) {
-    await sql`
-      INSERT INTO "2026_weekly_winners"
-        (competition_id, user_id, category, rank, total_valid_steps, prize_percentage, prize_amount)
-      VALUES (
-        ${competition.id},
-        ${nftWinner.user_id},
-        'nft_holder',
-        NULL,
-        ${nftWinner.total_valid_steps},
-        ${(NFT_HOLDER_POOL_PCT * 100).toFixed(2)},
-        ${pool > 0 ? (pool * NFT_HOLDER_POOL_PCT).toFixed(8) : null}
-      )
-      ON CONFLICT (competition_id, category, user_id) DO NOTHING
-    `
-  }
-
   // Insertar ganador OG
   if (ogWinner) {
     await sql`
@@ -304,10 +212,8 @@ async function main() {
     WHERE id = ${competition.id}
   `
 
-  // Calcular acumulado para la siguiente semana
-  const accumulatedNft = !nftWinner ? pool * NFT_HOLDER_POOL_PCT : 0
-  const accumulatedOg  = !ogWinner  ? pool * OG_POOL_PCT         : 0
-  const nextAccumulated = accumulatedNft + accumulatedOg
+  // Acumulado para siguiente semana (solo OG si no hay ganador)
+  const nextAccumulated = !ogWinner ? pool * OG_POOL_PCT : 0
 
   // Insertar nueva semana
   await sql`
