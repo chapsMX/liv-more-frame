@@ -43,6 +43,12 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
         Choose your wearable to get started.
       </p>
 
+      {user.provider === "google" && (
+        <p className={`text-amber-400/90 text-center text-sm max-w-sm border border-amber-500/40 rounded-lg px-3 py-2 ${protoMono.className}`}>
+          Google Fit is no longer available. Connect Garmin, Polar, or Oura to keep tracking your steps.
+        </p>
+      )}
+
       <section className="w-full max-w-sm mt-4 space-y-3">
         <h2 className={`text-sm font-semibold text-gray-500 uppercase tracking-wide ${protoMono.className}`}>
           Connect device
@@ -67,18 +73,6 @@ export default function ConnectDevice({ user }: ConnectDeviceProps) {
           className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#00d4aa] text-[#00d4aa] hover:bg-[#00d4aa] hover:text-white rounded-full min-w-[80px] transition-colors"
         >
           Connect Oura
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            openAuthUrl(
-              `/api/auth/google/connect?fid=${user.fid}&tz=${encodeURIComponent(tz)}`
-            );
-          }}
-          className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-transparent border-2 border-[#4285f4] text-[#4285f4] hover:bg-[#4285f4] hover:text-white rounded-full min-w-[80px] transition-colors"
-        >
-          Connect Google Fit
         </button>
         <p className={`text-gray-600 text-xs text-center mt-2 ${protoMono.className}`}>
           Both connections open in your browser. Once connected, close the browser window, return to the miniapp and refresh it.

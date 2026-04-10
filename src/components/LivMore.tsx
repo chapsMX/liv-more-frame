@@ -57,14 +57,17 @@ function formatSteps(n: number | string): string {
   return Number.isNaN(num) ? "0" : num.toLocaleString("en-US");
 }
 
-/** User has a device connected (from 2026_users.provider) */
-function hasDevice(provider: AppUser["provider"] | undefined): boolean {
-  return provider === "garmin" || provider === "polar" || provider === "oura" || provider === "google";
-}
-
-/** User has no device (null or undefined) */
-function hasNoDevice(provider: AppUser["provider"] | undefined): boolean {
-  return provider === null || provider === undefined;
+/**
+ * User can use the main home (activity table, attest, tabs).
+ * Includes legacy Google Fit: no live sync (API off), steps come only from DB — often zeros.
+ */
+function hasSupportedDevice(provider: AppUser["provider"] | undefined): boolean {
+  return (
+    provider === "garmin" ||
+    provider === "polar" ||
+    provider === "oura" ||
+    provider === "google"
+  );
 }
 
 function HamburgerIcon({ className }: { className?: string }) {
@@ -324,28 +327,20 @@ Tracking healthy habits, one step at a time 👟`;
   useEffect(() => {
     if (!sdkReady || !context?.user?.fid) return;
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected" || params?.get("oura") === "success" || params?.get("google") === "success") {
+    if (params?.get("garmin") === "connected" || params?.get("polar") === "connected" || params?.get("oura") === "success") {
       refetchUser();
       // Clean URL without full reload
       const url = new URL(window.location.href);
       url.searchParams.delete("garmin");
       url.searchParams.delete("polar");
       url.searchParams.delete("oura");
-      url.searchParams.delete("google");
       window.history.replaceState({}, "", url.pathname + (url.search || ""));
     }
   }, [sdkReady, context?.user?.fid, refetchUser]);
 
-  // Sync Google Fit steps when user opens app with provider=google
+  // Fetch last 10 days of steps (yesterday back) when user has a supported device
   useEffect(() => {
-    if (appUser?.provider === "google" && appUser?.fid) {
-      fetch(`/api/google/sync?fid=${appUser.fid}`);
-    }
-  }, [appUser?.provider, appUser?.fid]);
-
-  // Fetch last 10 days of steps (yesterday back) when user has a device (Garmin/Polar)
-  useEffect(() => {
-    if (!appUser?.fid || !hasDevice(appUser.provider)) {
+    if (!appUser?.fid || !hasSupportedDevice(appUser.provider)) {
       setWeeklySteps([]);
       return;
     }
@@ -457,7 +452,7 @@ Tracking healthy habits, one step at a time 👟`;
         />
       )}
       {activeTab === "og" && <OG />}
-      {activeTab === "home" && hasDevice(appUser?.provider) ? (
+      {activeTab === "home" && hasSupportedDevice(appUser?.provider) ? (
         <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
           <h1 className="text-xl text-center font-semibold text-white mb-1">One Step at a Time</h1>
 
@@ -566,6 +561,11 @@ Tracking healthy habits, one step at a time 👟`;
               <p className="text-gray-500 text-xs text-center mt-2 tracking-wide">
                 Only attested days count toward the weekly leaderboard.
               </p>
+              {appUser?.provider === "google" && (
+                <p className="text-gray-600 text-xs text-center mt-2 tracking-wide max-w-sm mx-auto">
+                  Google Fit no longer syncs new steps; you keep full app access. Totals here are only what&apos;s already saved.
+                </p>
+              )}
               {!weeklyStepsLoading &&
                 (stepsByDate.get(getYesterdayUTC()) ?? 0) > 0 &&
                 !attestationByDate.get(getYesterdayUTC()) &&
@@ -605,7 +605,7 @@ Tracking healthy habits, one step at a time 👟`;
             </section>
           )}
         </main>
-      ) : activeTab === "home" && appUser && hasNoDevice(appUser.provider) ? (
+      ) : activeTab === "home" && appUser && !hasSupportedDevice(appUser.provider) ? (
         <div className="flex-1 flex flex-col pt-14 pb-16 overflow-auto">
           <ConnectDevice user={appUser} onProviderSet={refetchUser} />
         </div>
@@ -651,7 +651,7 @@ Tracking healthy habits, one step at a time 👟`;
         {/* FAQs */}
         <section className={`w-full max-w-sm mt-4 p-4 rounded-xl border-2 border-dashed border-gray-600 bg-black ${protoMono.className}`}>
           <p className="text-sm text-gray-400">Wen token: soon, via Clanker</p>
-          <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura, Google Fit</p>
+          <p className="text-sm text-gray-400">Supported devices: Garmin, Polar, Oura</p>
         </section>
       </main>
       ) : null}

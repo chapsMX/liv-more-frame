@@ -165,10 +165,10 @@ export default function Steps({
 
   return (
     <main className={`flex-1 flex flex-col p-4 pt-14 pb-16 overflow-auto ${protoMono.className}`}>
-      <h1 className="text-xl text-center font-semibold text-white mb-4">Weekly Winners</h1>
+      <h1 className="text-xl text-center font-semibold text-white mb-2">Weekly Leaderboard</h1>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-700 mb-4">
+      <div className="flex border-b border-gray-700 mb-2">
         <button
           type="button"
           onClick={() => setTab("current")}
@@ -207,24 +207,8 @@ export default function Steps({
             </div>
           )}
 
-          {loading ? (
-            <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
-          ) : general.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">No attested steps this week yet.</p>
-          ) : (
-            <div className="space-y-0.5">
-              {general.map((e) => (
-                <LeaderboardRow
-                  key={e.id}
-                  entry={e}
-                  pfpMap={pfpMap}
-                  displayNameMap={displayNameMap}
-                />
-              ))}
-            </div>
-          )}
-
-          {canShare && (
+          {/* nuevo boton de compartir el leaderboard*/}
+             {canShare && (
             <button
               type="button"
               onClick={async () => {
@@ -249,9 +233,27 @@ export default function Steps({
             </button>
           )}
 
+          {loading ? (
+            <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
+          ) : general.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-8">No attested steps this week yet.</p>
+          ) : (
+            <div className="space-y-0.5">
+              {general.map((e) => (
+                <LeaderboardRow
+                  key={e.id}
+                  entry={e}
+                  pfpMap={pfpMap}
+                  displayNameMap={displayNameMap}
+                />
+              ))}
+            </div>
+          )}
+          {/* boton para compartir el leaderboard*/}
+
           <p className="text-gray-500 text-xs text-center mt-5 tracking-wide">
             Only attested steps count toward the leaderboard.
-          </p>
+          </p><br />
         </section>
       )}
 

@@ -122,7 +122,7 @@ export type PatchUserBody = {
   fid: number;
   og?: boolean;
   /** Set provider (e.g. after OAuth). Set to null to disconnect and clear tokens. */
-  provider?: "garmin" | "polar" | "oura" | "google" | null;
+  provider?: "garmin" | "polar" | "oura" | null;
   /** Server-only: set by OAuth callback. Do not send from client. */
   provider_access_token?: string | null;
   provider_refresh_token?: string | null;
@@ -174,11 +174,10 @@ export async function PATCH(request: Request) {
         provider !== null &&
         provider !== "garmin" &&
         provider !== "polar" &&
-        provider !== "oura" &&
-        provider !== "google"
+        provider !== "oura"
       ) {
         return NextResponse.json(
-          { success: false, error: "provider must be 'garmin', 'polar', 'oura', 'google', or null" },
+          { success: false, error: "provider must be 'garmin', 'polar', 'oura', or null" },
           { status: 400 }
         );
       }

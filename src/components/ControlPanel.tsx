@@ -269,7 +269,11 @@ export default function ControlPanel() {
                     <span className="text-white">Wearable:</span>
                     {deviceProvider ? (
                       <>
-                        <span className="text-gray-300 capitalize">{deviceProvider}</span>
+                        <span className="text-gray-300 capitalize">
+                          {deviceProvider === "google"
+                            ? "Google Fit (connect another device on Home)"
+                            : deviceProvider}
+                        </span>
                         <span className="text-gray-600">·</span>
                         <button
                           type="button"
@@ -305,23 +309,10 @@ export default function ControlPanel() {
                             </a>
                           </>
                         )}
-                        {deviceProvider === "google" && (
-                          <>
-                            <span className="text-gray-600">·</span>
-                            <a
-                              href="https://myaccount.google.com/connections/fitness"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-amber-400 hover:text-amber-300 underline"
-                            >
-                              Manage on Google
-                            </a>
-                          </>
-                        )}
                       </>
                     ) : (
                       <Link href="/" className="text-amber-400 hover:text-amber-300 underline">
-                        Connect device (Garmin, Polar, Oura, or Google Fit)
+                        Connect device (Garmin, Polar, or Oura)
                       </Link>
                     )}
                   </p>
