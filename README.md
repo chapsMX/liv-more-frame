@@ -1,5 +1,6 @@
 # LivMore
 
+MiniApp para Farcaster, la app morada.
 Turn healthy habits into rewards.
 
 **LivMore** is a [Farcaster Mini App](https://miniapps.farcaster.xyz/) built with **Next.js 15** (App Router) and **React 19**. Users connect a wearable (**Garmin**, **Polar**, or **Oura**), sync daily steps into **PostgreSQL (Neon)**, **attest** days on-chain with **Ethereum Attestation Service (EAS)** on Base, and compete on **weekly** and **monthly** leaderboards tied to the **$STEPS** ecosystem.
