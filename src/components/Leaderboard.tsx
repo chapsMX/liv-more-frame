@@ -114,9 +114,18 @@ export default function Leaderboard() {
     try {
       const res = await fetch("/api/leaderboard/months");
       const data = await res.json();
-      const months = Array.isArray(data) ? data : [];
-      setAvailableMonths(months);
-      setSelectedKey((prev) => (prev ? prev : months.length > 0 ? `${months[0].year}-${months[0].month}` : ""));
+      const raw = (Array.isArray(data) ? data : []) as AvailableMonth[];
+      const d = new Date();
+      const curY = d.getFullYear();
+      const curM = d.getMonth() + 1;
+
+      const hasCurrent = raw.some((x) => x.year === curY && x.month === curM);
+      const merged: AvailableMonth[] = hasCurrent ? [...raw] : [{ year: curY, month: curM }, ...raw];
+
+      merged.sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month - a.month));
+
+      setAvailableMonths(merged);
+      setSelectedKey((prev) => (prev ? prev : `${curY}-${curM}`));
     } catch (e) {
       console.error("[Leaderboard] months fetch error:", e);
       setAvailableMonths([]);
@@ -190,8 +199,9 @@ export default function Leaderboard() {
       setDisplayNameMap({});
       return;
     }
-    const fids = dataToUse.map((r) => String(r.fid)).join(",");
-    fetch(`/api/neynar?fids=${fids}`)
+    const uniqueFids = [...new Set(dataToUse.map((r) => r.fid))];
+    const fids = uniqueFids.join(",");
+    fetch(`/api/neynar?fids=${encodeURIComponent(fids)}`)
       .then((res) => res.json())
       .then((data) => {
         if (!data.success || !data.users) return;
@@ -263,7 +273,7 @@ export default function Leaderboard() {
           {/* Month filter */}
           <div className="mb-4">
             <select
-              value={selectedKey || (availableMonths[0] ? `${availableMonths[0].year}-${availableMonths[0].month}` : "")}
+              value={selectedKey}
               onChange={(e) => setSelectedKey(e.target.value)}
               className="w-full bg-gray-800 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff8800]"
             >
