@@ -5,9 +5,9 @@ const appUrl = process.env.NEXT_PUBLIC_URL;
 
 const frame = {
   version: "next",
-  imageUrl: `${appUrl}/frameImage.png`,
+  imageUrl: `${appUrl}/newHerorect.png`,
   button: {   
-    title: "Join Liv More Beta Test",
+    title: "LivMore 2.0",
     action: {
       type: "launch_frame",
       name: "Liv More",
@@ -25,10 +25,11 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Liv More",
     openGraph: {
       title: "Liv More",
-      description: "Turn Healty Habitos Into Rewards",
+      description: "Tracking your healthy habits",
     },
     other: {
       "fc:frame": JSON.stringify(frame),
+      "base:app_id": "6980f8191672d70694e29334",
     },
   };
 }
