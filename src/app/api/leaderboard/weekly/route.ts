@@ -19,10 +19,7 @@ export async function GET() {
     const competition = compRows[0] as { id: number; week_number: number; year: number; week_start: string; week_end: string } | undefined
 
     if (!competition) {
-      return NextResponse.json({
-        competition: null,
-        general: [],
-      })
+      return NextResponse.json({ competition: null, general: [] })
     }
 
     const general = await sql`
@@ -30,6 +27,10 @@ export async function GET() {
         u.id,
         u.fid,
         u.username,
+        u.display_name,
+        u.basename,
+        u.eth_address,
+        u.auth_type,
         u.og,
         SUM(ds.steps)::int AS total_valid_steps,
         RANK() OVER (ORDER BY SUM(ds.steps) DESC) AS rank
@@ -37,7 +38,7 @@ export async function GET() {
       JOIN "2026_users" u ON u.id = ds.user_id
       WHERE ds.attestation_hash IS NOT NULL
         AND ds.date BETWEEN ${competition.week_start}::date AND ${competition.week_end}::date
-      GROUP BY u.id, u.fid, u.username, u.og
+      GROUP BY u.id, u.fid, u.username, u.display_name, u.basename, u.eth_address, u.auth_type, u.og
       ORDER BY total_valid_steps DESC
     `
 
@@ -53,6 +54,10 @@ export async function GET() {
         id: r.id,
         fid: r.fid,
         username: r.username ?? '',
+        display_name: r.display_name ?? null,
+        basename: r.basename ?? null,
+        eth_address: r.eth_address ?? null,
+        auth_type: r.auth_type ?? 'farcaster',
         og: r.og,
         total_valid_steps: r.total_valid_steps,
         rank: Number(r.rank),

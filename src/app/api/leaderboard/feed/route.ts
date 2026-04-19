@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-/**
- * Returns chronological feed of all daily steps (with or without attestations).
- * Ordered by date DESC, most recent first.
- * Limit 200 entries.
- */
 export async function GET(req: NextRequest) {
   try {
     const limit = Math.min(
@@ -19,6 +14,10 @@ export async function GET(req: NextRequest) {
         ds.user_id,
         u.fid,
         u.username,
+        u.display_name,
+        u.basename,
+        u.eth_address,
+        u.auth_type,
         u.og,
         ds.date,
         ds.steps,

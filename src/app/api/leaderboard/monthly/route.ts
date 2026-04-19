@@ -11,6 +11,10 @@ export async function GET(req: NextRequest) {
       u.id,
       u.fid,
       u.username,
+      u.display_name,
+      u.basename,
+      u.eth_address,
+      u.auth_type,
       u.og,
       SUM(ds.steps) AS total_steps,
       COUNT(ds.date) AS days_attested,
@@ -21,7 +25,7 @@ export async function GET(req: NextRequest) {
       ds.attestation_hash IS NOT NULL
       AND EXTRACT(YEAR  FROM ds.date) = ${year}
       AND EXTRACT(MONTH FROM ds.date) = ${month}
-    GROUP BY u.id, u.fid, u.username, u.og
+    GROUP BY u.id, u.fid, u.username, u.display_name, u.basename, u.eth_address, u.auth_type, u.og
     ORDER BY total_steps DESC
   `
 
