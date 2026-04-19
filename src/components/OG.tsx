@@ -8,9 +8,29 @@ export default function OG() {
       <h1 className={`text-xl font-semibold text-white ${protoMono.className}`}>
         OG Members
       </h1>
-      <p className={`text-gray-400 text-center text-base max-w-sm ${protoMono.className}`}>
-        Perks are coming soon, for Minters and Holders.
-      </p>
+      <div className={`text-gray-400 text-center text-base max-w-md space-y-3 ${protoMono.className}`}>
+        <p>
+          <a
+            href="https://opensea.io/collection/livmore-og"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-500 hover:text-green-400 underline"
+          >
+            LivMore OG on OpenSea
+          </a>
+        </p>
+        <p>
+          Weekly rewards are paid in <span className="text-white font-medium">$STEPS</span>. Contract:{" "}
+          <a
+            href="https://basescan.org/token/0x71EfeeA893a6706437913e6a8187573b58BB2B07"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-500 hover:text-green-400 underline break-all"
+          >
+            0x71EfeeA893a6706437913e6a8187573b58BB2B07
+          </a>
+        </p>
+      </div>
     </main>
   );
 }

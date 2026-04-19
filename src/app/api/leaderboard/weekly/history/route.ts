@@ -21,8 +21,12 @@ export async function GET() {
       week_end: string
       general: Array<{
         id: number
-        fid: number
-        username: string
+        fid: number | null
+        username: string | null
+        display_name: string | null
+        basename: string | null
+        eth_address: string | null
+        auth_type: string | null
         og: boolean
         total_valid_steps: number
         rank: number
@@ -35,6 +39,10 @@ export async function GET() {
           u.id,
           u.fid,
           u.username,
+          u.display_name,
+          u.basename,
+          u.eth_address,
+          u.auth_type,
           u.og,
           w.total_valid_steps,
           w.rank
@@ -53,7 +61,11 @@ export async function GET() {
         general: winners.map((r) => ({
           id: r.id,
           fid: r.fid,
-          username: r.username ?? '',
+          username: r.username ?? null,
+          display_name: r.display_name ?? null,
+          basename: r.basename ?? null,
+          eth_address: r.eth_address ?? null,
+          auth_type: r.auth_type ?? 'farcaster',
           og: r.og,
           total_valid_steps: r.total_valid_steps,
           rank: Number(r.rank),

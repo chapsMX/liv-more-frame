@@ -5,8 +5,12 @@ import { protoMono } from "../styles/fonts";
 
 type MonthlyRow = {
   id: number;
-  fid: number;
+  fid: number | null;
   username: string | null;
+  display_name: string | null;
+  basename: string | null;
+  eth_address: string | null;
+  auth_type: "farcaster" | "wallet" | null;
   og: boolean;
   total_steps: number;
   days_attested: number;
@@ -26,8 +30,12 @@ type AllTimeRow = {
 type FeedRow = {
   id: number;
   user_id: number;
-  fid: number;
+  fid: number | null;
   username: string | null;
+  display_name: string | null;
+  basename: string | null;
+  eth_address: string | null;
+  auth_type: "farcaster" | "wallet" | null;
   og: boolean;
   date: string;
   steps: number;
@@ -45,6 +53,47 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
+
+function truncateAddress(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function getDisplayName(row: {
+  fid?: number | null;
+  username?: string | null;
+  display_name?: string | null;
+  basename?: string | null;
+  eth_address?: string | null;
+  auth_type?: string | null;
+}): string {
+  if (row.auth_type === "wallet") {
+    return row.basename ?? row.display_name ?? (row.eth_address ? truncateAddress(row.eth_address) : "—");
+  }
+  return row.username ?? `fid:${row.fid}`;
+}
+
+function PlatformBadge({ authType, og }: { authType?: string | null; og: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {authType === "wallet" ? (
+        <svg width="12" height="12" viewBox="0 0 1280 1280" fill="none" className="inline shrink-0">
+          <path
+            d="M0,101.12c0-34.64,0-51.95,6.53-65.28,6.25-12.76,16.56-23.07,29.32-29.32C49.17,0,66.48,0,101.12,0h1077.76c34.63,0,51.96,0,65.28,6.53,12.75,6.25,23.06,16.56,29.32,29.32,6.52,13.32,6.52,30.64,6.52,65.28v1077.76c0,34.63,0,51.96-6.52,65.28-6.26,12.75-16.57,23.06-29.32,29.32-13.32,6.52-30.65,6.52-65.28,6.52H101.12c-34.64,0-51.95,0-65.28-6.52-12.76-6.26-23.07-16.57-29.32-29.32-6.53-13.32-6.53-30.65-6.53-65.28V101.12Z"
+            fill="#0052ff"
+          />
+        </svg>
+      ) : (
+        <svg width="20" height="20" viewBox="0 0 1000 1000" fill="none" className="inline shrink-0">
+          <path
+            d="M847.387 270V343.023H774.425V415.985H796.779V416.01H847.387V810.795H725.173L725.099 810.434L662.737 515.101C656.791 486.949 641.232 461.477 618.927 443.362C596.623 425.248 568.527 415.275 539.818 415.275H539.575C510.866 415.275 482.77 425.248 460.466 443.362C438.161 461.477 422.602 486.958 416.657 515.101L354.223 810.795H232V416.001H282.608V415.985H304.959V343.023H232V270H847.387Z"
+            fill="#8B5CF6"
+          />
+        </svg>
+      )}
+      {og && <span className="text-amber-400 text-xs ml-0.5" title="OG">◆</span>}
+    </span>
+  );
+}
 
 function parseDate(val: string | null | undefined): Date {
   if (val == null) return new Date(NaN);
@@ -296,95 +345,99 @@ export default function Leaderboard() {
           ) : monthlyData.length === 0 ? (
             <p className="text-gray-500 text-sm text-center py-8">No data for this month.</p>
           ) : (
-            <div className="space-y-0.5">
-              {monthlyData.map((row) => (
-                <div
-                  key={row.id}
-                  className={`flex items-center gap-3 py-1.5 px-2 rounded bg-gray-900/50 border border-gray-800 ${protoMono.className}`}
-                >
-                  <span className="text-white font-bold text-sm shrink-0 w-8">#{row.rank}</span>
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 shrink-0">
-                    {pfpMap[row.fid] ? (
-                      <img
-                        src={pfpMap[row.fid]}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        width={40}
-                        height={40}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                        ?
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">
-                      {displayNameMap[row.fid] ?? row.username ?? `fid:${row.fid}`}
-                      {row.og && <span className="ml-1 text-amber-400" title="OG">◆</span>}
-                    </p>
-                    <p className="text-gray-400 text-sm truncate">@{row.username ?? `fid:${row.fid}`}</p>
-                  </div>
-                  <span className="text-white font-bold text-lg shrink-0">
-                    {formatSteps(row.total_steps)} 👟
-                  </span>
-                </div>
-              ))}
-            </div>
+<div className="space-y-0.5">
+  {monthlyData.map((row) => (
+    <div
+      key={row.id}
+      className={`flex items-center gap-3 py-1.5 px-2 rounded bg-gray-900/50 border border-gray-800 ${protoMono.className}`}
+    >
+      <span className="text-white font-bold text-sm shrink-0 w-4">#{row.rank}</span>
+      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 shrink-0">
+        {row.fid && pfpMap[row.fid] ? (
+          <img
+            src={pfpMap[row.fid]}
+            alt=""
+            className="w-full h-full object-cover"
+            width={40}
+            height={40}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+            ?
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-medium truncate">
+          {row.fid ? (displayNameMap[row.fid] ?? getDisplayName(row)) : getDisplayName(row)}
+          {" "}<PlatformBadge authType={row.auth_type} og={row.og} />
+        </p>
+        <p className="text-gray-400 text-sm truncate">
+          {row.auth_type === "wallet"
+            ? (row.eth_address ? truncateAddress(row.eth_address) : "—")
+            : `@${row.username ?? `fid:${row.fid}`}`}
+        </p>
+      </div>
+      <span className="text-white font-bold text-lg shrink-0">
+        {formatSteps(row.total_steps)} 👟
+      </span>
+    </div>
+  ))}
+</div>
           )}
         </section>
       )}
 
       {/* Feed tab */}
       {tab === "feed" && (
-        <section className="w-full max-w-sm mx-auto">
-          {feedLoading ? (
-            <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
-          ) : feedData.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">No activity yet.</p>
-          ) : (
-            <div className="space-y-0.5">
-              {feedData.map((row) => (
-                <div
-                  key={`${row.user_id}-${row.date}`}
-                  className={`flex items-center gap-3 py-1.5 px-2 rounded bg-gray-900/50 border border-gray-800 ${protoMono.className}`}
-                >
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 shrink-0">
-                    {pfpMap[row.fid] ? (
-                      <img
-                        src={pfpMap[row.fid]}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        width={40}
-                        height={40}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                        ?
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">
-                      {displayNameMap[row.fid] ?? row.username ?? `fid:${row.fid}`}
-                      {row.og && <span className="ml-1 text-amber-400" title="OG">◆</span>}
-                    </p>
-                    <p className="text-gray-400 text-sm truncate">
-                      {formatDate(row.date)}
-                      {row.attested && (
-                        <span className="ml-1 text-emerald-400" title="Attested">✓</span>
-                      )}
-                    </p>
-                  </div>
-                  <span className="text-white font-bold text-lg shrink-0">
-                    {formatSteps(row.steps)} 👟
-                  </span>
+  <section className="w-full max-w-sm mx-auto">
+    {feedLoading ? (
+      <p className="text-gray-500 text-sm text-center py-8">Loading…</p>
+    ) : feedData.length === 0 ? (
+      <p className="text-gray-500 text-sm text-center py-8">No activity yet.</p>
+    ) : (
+      <div className="space-y-0.5">
+        {feedData.map((row) => (
+          <div
+            key={`${row.user_id}-${row.date}`}
+            className={`flex items-center gap-3 py-1.5 px-2 rounded bg-gray-900/50 border border-gray-800 ${protoMono.className}`}
+          >
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 shrink-0">
+              {row.fid && pfpMap[row.fid] ? (
+                <img
+                  src={pfpMap[row.fid]}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  width={40}
+                  height={40}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                  ?
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </section>
-      )}
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-medium truncate">
+                {row.fid ? (displayNameMap[row.fid] ?? getDisplayName(row)) : getDisplayName(row)}
+                {" "}<PlatformBadge authType={row.auth_type} og={row.og} />
+              </p>
+              <p className="text-gray-400 text-sm truncate">
+                {formatDate(row.date)}
+                {row.attested && (
+                  <span className="ml-1 text-emerald-400" title="Attested">✓</span>
+                )}
+              </p>
+            </div>
+            <span className="text-white font-bold text-lg shrink-0">
+              {formatSteps(row.steps)} 👟
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
 
       {/* All-Time tab */}
       {tab === "alltime" && (
