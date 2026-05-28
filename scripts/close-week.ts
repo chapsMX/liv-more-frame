@@ -14,7 +14,7 @@
  *   --dry-run   Solo muestra los ganadores sin escribir en la DB
  *   --week 10   Cierra una semana específica por número
  *   --year 2026
- *   --pool 1000 Define el pool de la siguiente semana
+ *   --pool 1000 Define el pool de esta semana y la siguiente
  */
 
 import 'dotenv/config'
@@ -25,9 +25,9 @@ import { neon } from '@neondatabase/serverless'
 const DATABASE_URL     = process.env.DATABASE_URL!
 
 const GENERAL_TOP_N    = 5
-const GENERAL_POOL_PCT = 0.60
+const GENERAL_POOL_PCT = 0.80
 const OG_POOL_PCT      = 0.20
-const GENERAL_EACH_PCT = GENERAL_POOL_PCT / GENERAL_TOP_N  // 0.12
+const GENERAL_EACH_PCT = GENERAL_POOL_PCT / GENERAL_TOP_N  // 0.16
 
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
@@ -72,8 +72,8 @@ async function main() {
   }
 
   // Extraer fechas calendario limpias (sin timezone)
-  const weekStart = new Date(competition.week_start).toISOString().split('T')[0] // "2026-03-16"
-  const weekEnd   = new Date(competition.week_end).toISOString().split('T')[0]   // "2026-03-22"
+  const weekStart = new Date(competition.week_start).toISOString().split('T')[0]
+  const weekEnd   = new Date(competition.week_end).toISOString().split('T')[0]
 
   console.log(`\n📅 Closing Week ${competition.week_number} · ${competition.year}`)
   console.log(`   ${weekStart} → ${weekEnd}`)
@@ -145,11 +145,10 @@ async function main() {
   }
 
   // 5. Resumen de premios
-  const pool = Number(competition.pool_amount ?? 0) + Number(competition.accumulated ?? 0)
+  const pool = poolArg ?? (Number(competition.pool_amount ?? 0) + Number(competition.accumulated ?? 0))
   console.log(`\n💰 Pool: ${pool.toLocaleString()} $STEPS`)
-  console.log(`   General (60%): ${(pool * GENERAL_POOL_PCT).toFixed(2)} ÷ ${GENERAL_TOP_N} = ${(pool * GENERAL_EACH_PCT).toFixed(2)} each`)
-  console.log(`   OG (20%): ${ogWinner ? `${(pool * OG_POOL_PCT).toFixed(2)} → ${ogWinner.username}` : '⚠️  accumulates'}`)
-  console.log(`   NFT Holder (20%): pending manual check`)
+  console.log(`   General (80%): ${(pool * GENERAL_POOL_PCT).toFixed(2)} ÷ ${GENERAL_TOP_N} = ${(pool * GENERAL_EACH_PCT).toFixed(2)} each`)
+  console.log(`   OG (20%): ${ogWinner ? `${(pool * OG_POOL_PCT).toFixed(2)} → ${ogWinner.username}` : '⚠️  accumulates (no OG winner)'}`)
 
   // 6. Calcular siguiente semana
   const currentEnd  = new Date(competition.week_end)
@@ -218,7 +217,7 @@ async function main() {
     WHERE id = ${competition.id}
   `
 
-  // Acumulado para siguiente semana (solo OG si no hay ganador)
+  // Acumulado para siguiente semana (OG si no hay ganador)
   const nextAccumulated = !ogWinner ? pool * OG_POOL_PCT : 0
 
   // Insertar nueva semana
