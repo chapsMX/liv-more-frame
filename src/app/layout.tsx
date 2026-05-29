@@ -5,9 +5,25 @@ import { protoMono } from '../styles/fonts';
 import clsx from 'clsx';
 import Providers from './Providers';
 
+const APP_URL = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, '') ?? '';
+
 export const metadata: Metadata = {
   title: 'LivMore',
   description: 'Turn healthy habits into rewards',
+  ...(APP_URL && { metadataBase: new URL(APP_URL) }),
+  openGraph: {
+    type: 'website',
+    url: APP_URL,
+    title: 'LivMore',
+    description: 'Turn healthy habits into rewards',
+    images: [{ url: '/newHero.png' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LivMore',
+    description: 'Turn healthy habits into rewards',
+    images: ['/newHero.png'],
+  },
   other: {
     'base:app_id': '6980f8191672d70694e29334',
   },
