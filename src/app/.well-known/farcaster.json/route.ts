@@ -2,10 +2,10 @@ export async function GET() {
   const appUrl = process.env.NEXT_PUBLIC_URL;
 
   const config = {
-    accountAssociation: {
-      "header": "eyJmaWQiOjEwMjA2NzcsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhlOTc1OEY5NmQ0OUFkMjVkMTBlYjZENUU1ODg3MzEwMUNCRDcxNWQ0In0",
-      "payload": "eyJkb21haW4iOiJhcHAubGl2bW9yZS5saWZlIn0",
-      "signature": "MHhjNmMyYWJjNzZkZDBlNjdmNWZkNTllZGE2MjhiYzk2NjEwOGFjNjUzNjI5NzBmNDcxZGQ2NWZkMWYwNzU3NTMyMjA4ZGI2ZTc0NTIwMDYzMDAxZWYyNTVhOWRjM2IyMDkwYmQ1ZTVlNmJlNzg5ZDY2YmU1YmJiY2YyNDBhODBmYzFj"
+      "accountAssociation": {
+        "header": "eyJmaWQiOjEwMjA2NzcsInR5cGUiOiJhdXRoIiwia2V5IjoiMHgwN0I1ZkQwNTc1QzAxQjZhY2JGMDg2RkNkRDRiODBGMjhlQzc0NDVCIn0",
+        "payload": "eyJkb21haW4iOiJhcHAubGl2bW9yZS5saWZlIn0",
+        "signature": "8cZt1c3t7BWc3uBQUgu4sKJyqrVUGy+mSO0RE8KFamlLLAkcCFer6QYzmHGvV8PPN91K0qSWXGRbc2iPWk3yqxw="
     },
     frame: {
       version: "1",

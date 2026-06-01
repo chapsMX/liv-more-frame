@@ -591,9 +591,9 @@ Tracking healthy habits, one step at a time 👟`;
                   <span className="font-semibold">Weekly prizes</span> are distributed every week from 100% of tx fees collected in $STEPS tokens:
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>60% split equally among the <span className="font-semibold">Top 5</span> users with the most attested steps</li>
+                  <li>80% split equally among the <span className="font-semibold">Top 5</span> users with the most attested steps</li>
                   <li>20% to the <span className="font-semibold">NFT holder</span> with the most attested steps</li>
-                  <li>20% to the <span className="font-semibold">OG minter</span> with the most attested steps</li>
+                  <li>Perks for <span className="font-semibold">OG minters</span> will be announced soon</li>
                 </ul>
                 <p>
                   A single user can win in multiple categories simultaneously.

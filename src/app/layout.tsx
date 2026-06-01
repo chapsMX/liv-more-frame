@@ -5,12 +5,12 @@ import { protoMono } from '../styles/fonts';
 import clsx from 'clsx';
 import Providers from './Providers';
 
-const APP_URL = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, '') ?? '';
+const APP_URL = process.env.NEXT_PUBLIC_URL?.replace(/\/+$/, '') ?? 'https://app.livmore.life';
 
 export const metadata: Metadata = {
   title: 'LivMore',
   description: 'Turn healthy habits into rewards',
-  ...(APP_URL && { metadataBase: new URL(APP_URL) }),
+  metadataBase: new URL(APP_URL),
   openGraph: {
     type: 'website',
     url: APP_URL,
